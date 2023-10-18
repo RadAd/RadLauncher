@@ -16,8 +16,19 @@
 #include <propkey.h>
 
 #include <ShlGuid.h>
+#include <shellapi.h>
 
-#include <vector>
+#include <map>
+
+template<class K, class V>
+const V& GetOr(const std::map<K, V>& map, const K& k, const V& v = {})
+{
+    auto it = map.find(k);
+    if (it != map.end())
+        return it->second;
+    else
+        return v;
+}
 
 void AppendMenuHeader(HMENU hMenu, CString name)
 {
@@ -29,7 +40,8 @@ void AppendMenuHeader(HMENU hMenu, CString name)
 struct JumpListData
 {
     UINT minid;
-    std::vector<CComPtr<IUnknown>> objects;
+    std::map<UINT, CComPtr<IUnknown>> objects;
+    std::map<UINT, HICON> icons;
 };
 
 struct Data
@@ -57,8 +69,7 @@ void DoCollection(Data& data, IObjectCollection* pCollection)
                     CHECK_HR(pItem->GetDisplayName(SIGDN_NORMALDISPLAY, &pName));
                     AppendMenu(data.hMenu, MF_STRING | MF_ENABLED, data.id++, pName);
                     SetMenuItemBitmap(data.hMenu, data.id - 1, FALSE, HBMMENU_CALLBACK);
-                    data.pData->objects.emplace_back(pUnknown);
-                    CHECK(data.pData->objects.size() == (data.id - data.pData->minid));
+                    data.pData->objects[data.id - 1] = pUnknown;
                 }
 
                 CComQIPtr<IShellLink> pLink(pUnknown);
@@ -66,18 +77,36 @@ void DoCollection(Data& data, IObjectCollection* pCollection)
                 {
                     CComQIPtr<IPropertyStore> pStore(pLink);
 
-
                     BOOL bSeparator = GetPropertyStoreBool(pStore, PKEY_AppUserModel_IsDestListSeparator);
                     if (bSeparator)
                         AppendMenu(data.hMenu, MF_SEPARATOR, 0, nullptr);
                     else
                     {
+                        const CString str = LoadIndirectString(GetPropertyStoreString(pStore, PKEY_Title));
+
+                        AppendMenu(data.hMenu, MF_STRING | MF_ENABLED, data.id++, str);
+                        data.pData->objects[data.id - 1] = pUnknown;
+
+                        {
+                            WCHAR iconloc[1024] = TEXT("");
+                            int iconindex = 0;
+                            if (SUCCEEDED(pLink->GetIconLocation(iconloc, ARRAYSIZE(iconloc), &iconindex)) && iconloc[0] != TEXT('\0'))
+                            {
+                                HICON hIcon = NULL;
+                                ExtractIconEx(iconloc, iconindex, NULL, &hIcon, 1);
+                                if (hIcon)
+                                {
+                                    data.pData->icons[data.id - 1] = hIcon;
+                                    SetMenuItemBitmap(data.hMenu, data.id - 1, FALSE, HBMMENU_CALLBACK);
+                                }
+                            }
+                        }
+
                         static const SIZE sz = { GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON) };
 
                         CString appId = GetPropertyStoreString(pStore, PKEY_AppUserModel_ID);
                         if (appId.IsEmpty())
                             appId = data.pAppId;
-                        const CString str = LoadIndirectString(GetPropertyStoreString(pStore, PKEY_Title));
                         const CString icon = GetPropertyStoreString(pStore, PKEY_AppUserModel_DestListLogoUri);
 
                         CString packageName;
@@ -96,10 +125,6 @@ void DoCollection(Data& data, IObjectCollection* pCollection)
                                 }
                             }
                         }
-
-                        AppendMenu(data.hMenu, MF_STRING | MF_ENABLED, data.id++, str);
-                        data.pData->objects.emplace_back(pUnknown);
-                        CHECK(data.pData->objects.size() == (data.id - data.pData->minid));
 
                         // ms-appdata   https://learn.microsoft.com/en-us/uwp/api/windows.storage.applicationdata.localfolder?view=winrt-22621
                         if (icon.Left(13) == TEXT("ms-appdata://"))
@@ -316,10 +341,12 @@ void DoJumpListMenu(HWND hWnd, JumpListData* pData, int id)
 {
     std::unique_ptr<JumpListData> to_delete(pData);
 
-    if (id > 0 && id <= pData->objects.size())
-    {
-        CComPtr<IUnknown> pUnknown(pData->objects[id - pData->minid]);
+    for (auto& i : pData->icons)
+        DestroyIcon(i.second);
 
+    CComPtr<IUnknown> pUnknown = GetOr<UINT>(pData->objects, id);
+    if (pUnknown)
+    {
         CComQIPtr<IShellItem> pItem(pUnknown);
         if (pItem)
         {
@@ -360,16 +387,20 @@ void DoJumpListMenu(HWND hWnd, JumpListData* pData, int id)
     }
 }
 
-int JumpListMenuGetIcon(JumpListData* pData, int id)
+int JumpListMenuGetSystemIcon(JumpListData* pData, int id)
 {
-    if (id > 0 && id <= pData->objects.size())
+    CComPtr<IUnknown> pUnknown = GetOr<UINT>(pData->objects, id);
+    if (pUnknown)
     {
-        CComPtr<IUnknown> pUnknown(pData->objects[id - pData->minid]);
         CComQIPtr<IShellItem> pItem(pUnknown);
         if (pItem)
             return GetIconIndex(pItem);
-
     }
 
     return -1;
+}
+
+HICON JumpListMenuGetIcon(JumpListData* pData, int id)
+{
+    return GetOr<UINT>(pData->icons, id);
 }

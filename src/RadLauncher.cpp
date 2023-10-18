@@ -283,7 +283,7 @@ void RootWindow::OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem)
     {
         if (m_hImageListMenu && m_pjld)
         {
-            const int index = JumpListMenuGetIcon(m_pjld, lpMeasureItem->itemID);
+            const int index = JumpListMenuGetSystemIcon(m_pjld, lpMeasureItem->itemID);
             if (index >= 0)
             {
                 int cx = 0, cy = 0;
@@ -291,6 +291,20 @@ void RootWindow::OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem)
 
                 lpMeasureItem->itemWidth = std::max(lpMeasureItem->itemWidth, UINT(cx));
                 lpMeasureItem->itemHeight = std::max(lpMeasureItem->itemHeight, UINT(cy));
+            }
+
+            const HICON hIcon = JumpListMenuGetIcon(m_pjld, lpMeasureItem->itemID);
+            if (hIcon != NULL)
+            {
+                ICONINFO ii = {};
+                CHECK(GetIconInfo(hIcon, &ii));
+                BITMAP bm = {};
+                GetObject(ii.hbmColor, sizeof(bm), &bm);
+                DeleteObject(ii.hbmColor);
+                DeleteObject(ii.hbmMask);
+
+                lpMeasureItem->itemWidth = std::max(lpMeasureItem->itemWidth, UINT(bm.bmWidth));
+                lpMeasureItem->itemHeight = std::max(lpMeasureItem->itemHeight, UINT(bm.bmHeight));
             }
         }
 
@@ -323,9 +337,13 @@ void RootWindow::OnDrawItem(const DRAWITEMSTRUCT* lpDrawItem)
     {
         if (m_hImageListMenu && m_pjld)
         {
-            const int index = JumpListMenuGetIcon(m_pjld, lpDrawItem->itemID);
+            const int index = JumpListMenuGetSystemIcon(m_pjld, lpDrawItem->itemID);
             if (index >= 0)
                 CHECK(ImageList_Draw(m_hImageListMenu, index, lpDrawItem->hDC, lpDrawItem->rcItem.left, lpDrawItem->rcItem.top, ILD_TRANSPARENT | (lpDrawItem->itemState & ODA_SELECT ? ILD_SELECTED : ILD_NORMAL)));
+
+            const HICON hIcon = JumpListMenuGetIcon(m_pjld, lpDrawItem->itemID);
+            if (hIcon != NULL)
+                DrawIconEx(lpDrawItem->hDC, lpDrawItem->rcItem.left, lpDrawItem->rcItem.top, hIcon, 0, 0, 0, NULL, DI_NORMAL);
         }
 
         if (lpDrawItem->itemData)

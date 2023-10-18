@@ -6,6 +6,7 @@
 interface IShellItem;
 
 struct JumpListData;
-JumpListData* FillJumpListMenu(HMENU hMenu, IShellItem* pShellItem); // JumpListMenu.cpp
-void DoJumpListMenu(HWND hWnd, JumpListData* pData, int id); // JumpListMenu.cpp
-int JumpListMenuGetIcon(JumpListData* pData, int id); // JumpListMenu.cpp
+JumpListData* FillJumpListMenu(HMENU hMenu, IShellItem* pShellItem);
+void DoJumpListMenu(HWND hWnd, JumpListData* pData, int id);
+int JumpListMenuGetSystemIcon(JumpListData* pData, int id);
+HICON JumpListMenuGetIcon(JumpListData* pData, int id);
