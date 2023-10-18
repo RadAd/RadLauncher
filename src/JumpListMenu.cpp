@@ -1,0 +1,375 @@
+#define STRICT
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
+#include "JumpListMenu.h"
+#include "JumpList.h"
+#include "ShellUtils.h"
+#include "ImageUtils.h"
+#include "WindowsUtils.h"
+
+#include "Rad/Log.h"
+#include "Rad/MemoryPlus.h"
+
+#include <atlcomcli.h>
+#include <atlstr.h>
+#include <propkey.h>
+
+#include <ShlGuid.h>
+
+#include <vector>
+
+void AppendMenuHeader(HMENU hMenu, CString name)
+{
+    if (GetMenuItemCount(hMenu) > 0)
+        AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+    CHECK(AppendMenu(hMenu, MF_OWNERDRAW | MF_GRAYED | MF_DISABLED, 0, _wcsdup(name))); // TODO not deleting this wcsdup yet
+}
+
+struct JumpListData
+{
+    UINT minid;
+    std::vector<CComPtr<IUnknown>> objects;
+};
+
+struct Data
+{
+    HMENU hMenu;
+    UINT id;
+    JumpListData* pData;
+    LPCWSTR pAppId;
+};
+
+void DoCollection(Data& data, IObjectCollection* pCollection)
+{
+    UINT count;
+    if (SUCCEEDED(pCollection->GetCount(&count)))
+    {
+        for (UINT i = 0; i < count; i++)
+        {
+            CComPtr<IUnknown> pUnknown;
+            if (SUCCEEDED(pCollection->GetAt(i, IID_PPV_ARGS(&pUnknown))) && pUnknown)
+            {
+                CComQIPtr<IShellItem> pItem(pUnknown);
+                if (pItem)
+                {
+                    CComHeapPtr<WCHAR> pName;
+                    CHECK_HR(pItem->GetDisplayName(SIGDN_NORMALDISPLAY, &pName));
+                    AppendMenu(data.hMenu, MF_STRING | MF_ENABLED, data.id++, pName);
+                    SetMenuItemBitmap(data.hMenu, data.id - 1, FALSE, HBMMENU_CALLBACK);
+                    data.pData->objects.emplace_back(pUnknown);
+                    CHECK(data.pData->objects.size() == (data.id - data.pData->minid));
+                }
+
+                CComQIPtr<IShellLink> pLink(pUnknown);
+                if (pLink)
+                {
+                    CComQIPtr<IPropertyStore> pStore(pLink);
+
+
+                    BOOL bSeparator = GetPropertyStoreBool(pStore, PKEY_AppUserModel_IsDestListSeparator);
+                    if (bSeparator)
+                        AppendMenu(data.hMenu, MF_SEPARATOR, 0, nullptr);
+                    else
+                    {
+                        static const SIZE sz = { GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON) };
+
+                        CString appId = GetPropertyStoreString(pStore, PKEY_AppUserModel_ID);
+                        if (appId.IsEmpty())
+                            appId = data.pAppId;
+                        const CString str = LoadIndirectString(GetPropertyStoreString(pStore, PKEY_Title));
+                        const CString icon = GetPropertyStoreString(pStore, PKEY_AppUserModel_DestListLogoUri);
+
+                        CString packageName;
+                        if (!appId.IsEmpty())
+                        {
+                            CComPtr<IShellItem2> target;
+                            if (SUCCEEDED(SHCreateItemInKnownFolder(FOLDERID_AppsFolder, 0, appId, IID_PPV_ARGS(&target))))
+                            {
+                                ULONG modern = 0;
+                                if (SUCCEEDED(target->GetUInt32(PKEY_AppUserModel_HostEnvironment, &modern)) && modern)
+                                {
+                                    CComPtr<IPropertyStore> pStore3;
+                                    target->BindToHandler(NULL, BHID_PropertyStore, IID_IPropertyStore, (void**) &pStore3);
+
+                                    packageName = GetPropertyStoreString(pStore3, PKEY_MetroPackageName);
+                                }
+                            }
+                        }
+
+                        AppendMenu(data.hMenu, MF_STRING | MF_ENABLED, data.id++, str);
+                        data.pData->objects.emplace_back(pUnknown);
+                        CHECK(data.pData->objects.size() == (data.id - data.pData->minid));
+
+                        // ms-appdata   https://learn.microsoft.com/en-us/uwp/api/windows.storage.applicationdata.localfolder?view=winrt-22621
+                        if (icon.Left(13) == TEXT("ms-appdata://"))
+                        {
+                            // TODO This is a workaround for now
+                            CString appId2(appId);
+                            appId2.Replace(TEXT("!App"), TEXT(""));
+
+                            CString SubPath = icon.Mid(13);
+                            SubPath.Replace(TEXT("/local"), TEXT(R"(\LocalState)"));
+                            SubPath.Replace(TEXT("/"), TEXT(R"(\)"));
+
+                            CString FilePath = ExpandEnvironmentStrings(TEXT(R"(%LOCALAPPDATA%\Packages\)")) + appId2 + SubPath;
+
+                            HBITMAP hBitmap = LoadImageFile(FilePath, &sz, true, true);
+                            if (hBitmap)
+                                SetMenuItemBitmap(data.hMenu, data.id - 1, FALSE, hBitmap);
+                        }
+                        else if (!packageName.IsEmpty())
+                        {
+                            CComPtr<IResourceManager> pResManager;
+                            CHECK_HR(pResManager.CoCreateInstance(CLSID_ResourceManager));
+                            CHECK_HR(pResManager->InitializeForPackage(packageName));
+
+                            CComPtr<IResourceContext> pResContext;
+                            CHECK_HR(pResManager->GetDefaultContext(IID_PPV_ARGS(&pResContext)));
+
+                            // TODO Doesn't appear to be working
+                            CHECK_HR(pResContext->SetTargetSize((WORD) sz.cx));
+                            CHECK_HR(pResContext->SetScale(RES_SCALE_80));
+                            CHECK_HR(pResContext->SetContrast(RES_CONTRAST_WHITE));
+
+                            CComPtr<IResourceMap> pResMap;
+                            CHECK_HR(pResManager->GetMainResourceMap(IID_PPV_ARGS(&pResMap)));
+
+                            CComHeapPtr<WCHAR> pFilePath;
+                            if (SUCCEEDED(pResMap->GetFilePath(icon, &pFilePath)))
+                            //if (SUCCEEDED(pResMap->GetFilePathForContext(pResContext, icon, &pFilePath)))
+                            {
+                                HBITMAP hBitmap = LoadImageFile(pFilePath, &sz, true, true);
+                                if (hBitmap)
+                                    SetMenuItemBitmap(data.hMenu, data.id - 1, FALSE, hBitmap); // TODO Does the menu delete the bitmap
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void DoCollection(Data& data, IObjectCollection* pCollection, CategoryType listType)
+{
+    UINT count = 0;
+    CHECK_HR(pCollection->GetCount(&count));
+
+    if (count > 0)
+    {
+        static LPCWSTR names[] = { L"Pinned", L"Recent", L"Frequent" };
+        AppendMenuHeader(data.hMenu, names[listType]);
+        DoCollection(data, pCollection);
+    }
+}
+
+void DoList(Data& data, IAutomaticDestinationList* m_pAutoList, IAutomaticDestinationList10b* m_pAutoList10b, CategoryType listType)
+{
+    BOOL bHasList = FALSE;
+    if (m_pAutoList)
+        CHECK_HR(m_pAutoList->HasList(&bHasList));
+    if (m_pAutoList10b)
+        CHECK_HR(m_pAutoList10b->HasList(&bHasList));
+
+    if (bHasList)
+    {
+        const unsigned int maxCount = 10;
+
+        CComPtr<IObjectCollection> pCollection;
+        if (m_pAutoList)
+            m_pAutoList->GetList(listType, maxCount, IID_PPV_ARGS(&pCollection));
+        if (m_pAutoList10b)
+            m_pAutoList10b->GetList(listType, maxCount, 1, IID_PPV_ARGS(&pCollection));
+
+        DoCollection(data, pCollection, listType);
+    }
+}
+
+void DoCustomList(Data& data, IDestinationList* pCustomList, UINT index, LPCWSTR name)
+{
+    AppendMenuHeader(data.hMenu, name);
+
+    CComPtr<IObjectCollection> pCollection;
+    CHECK_HR(pCustomList->EnumerateCategoryDestinations(index, IID_PPV_ARGS(&pCollection)));
+
+    DoCollection(data, pCollection);
+}
+
+void FillJumpListMenu(HMENU hMenu, JumpListData* pjld, LPCWSTR pAppId)
+{
+    Data data = { hMenu, pjld->minid, pjld, pAppId };
+
+    CComPtr<IAutomaticDestinationList> m_pAutoList;
+    CComPtr<IAutomaticDestinationList10b> m_pAutoList10b;
+    {
+        CComPtr<IUnknown> pAutoListUnk;
+        CHECK_HR(pAutoListUnk.CoCreateInstance(CLSID_AutomaticDestinationList));
+
+        if (!m_pAutoList)
+            m_pAutoList = CComQIPtr<IAutomaticDestinationList>(pAutoListUnk);
+        if (!m_pAutoList10b)
+            m_pAutoList10b = CComQIPtr<IAutomaticDestinationList10b>(pAutoListUnk);
+
+        if (m_pAutoList)
+            CHECK_HR(m_pAutoList->Initialize(pAppId, NULL, NULL));
+        if (m_pAutoList10b)
+            CHECK_HR(m_pAutoList10b->Initialize(pAppId, NULL, NULL));
+    }
+
+    DoList(data, m_pAutoList, m_pAutoList10b, TYPE_PINNED);
+
+    CComPtr<IDestinationList> pCustomList;
+    {
+        CComPtr<IUnknown> pCustomListUnk;
+        CHECK_HR(pCustomListUnk.CoCreateInstance(CLSID_DestinationList));
+
+        if (!pCustomList)
+            pCustomList = CComQIPtr<IDestinationList, &IID_IDestinationList>(pCustomListUnk);
+        if (!pCustomList)
+            pCustomList = CComQIPtr<IDestinationList, &IID_IDestinationList10a>(pCustomListUnk);
+        if (!pCustomList)
+            pCustomList = CComQIPtr<IDestinationList, &IID_IDestinationList10b>(pCustomListUnk);
+    }
+
+    UINT categoryCount = 0;
+    if (pCustomList)
+    {
+        CHECK_HR(pCustomList->SetApplicationID(pAppId));
+
+        CHECK_HR(pCustomList->GetCategoryCount(&categoryCount));
+
+        int tasks = -1;
+        for (UINT catIndex = 0; catIndex < categoryCount; catIndex++)
+        {
+            APPDESTCATEGORY category = {};
+            if (SUCCEEDED(pCustomList->GetCategory(catIndex, 1, &category)))
+            {
+                switch (category.type)
+                {
+                case 0:
+                    DoCustomList(data, pCustomList, catIndex, LoadIndirectString(category.name));
+                    CoTaskMemFree(category.name);
+                    break;
+
+                case 1:
+                    // category.subType 1 == "Frequent"
+                    // category.subType 2 == "Recent"
+                    DoList(data, m_pAutoList, m_pAutoList10b, CategoryType(3 - category.subType));
+                    break;
+
+                case 2:
+                    ATLASSERT(tasks == -1);
+                    tasks = catIndex;
+                    break;
+
+                default:
+                    ATLASSERT(FALSE);
+                    break;
+                }
+            }
+        }
+
+        if (tasks != -1)
+            DoCustomList(data, pCustomList, tasks, L"Tasks");
+    }
+
+    if (categoryCount == 0)
+        DoList(data, m_pAutoList, m_pAutoList10b, TYPE_RECENT);
+}
+
+JumpListData* FillJumpListMenu(HMENU hMenu, IShellItem* pShellItem)
+{
+    auto pjld = std::make_unique<JumpListData>();
+    pjld->minid = 1;
+
+    CComPtr<IApplicationResolver> pAppResolver;
+    {
+        CComPtr<IUnknown> pUnknown;
+        CHECK_HR(pUnknown.CoCreateInstance(CLSID_ApplicationResolver));
+
+        if (!pAppResolver)
+            pAppResolver = CComQIPtr<IApplicationResolver, &IID_IApplicationResolver7>(pUnknown);
+        if (!pAppResolver)
+            pAppResolver = CComQIPtr<IApplicationResolver, &IID_IApplicationResolver8>(pUnknown);
+    }
+
+    CComHeapPtr<WCHAR> pAppId;
+    if (SUCCEEDED(pAppResolver->GetAppIDForShortcut(pShellItem, &pAppId)))
+    {
+        FillJumpListMenu(hMenu, pjld.get(), pAppId);
+    }
+    else
+    {
+        CComPtr<IPropertyStore> pStore;
+        CHECK_HR(pShellItem->BindToHandler(NULL, BHID_PropertyStore, IID_PPV_ARGS(&pStore)));
+
+        CString TheAppId = GetPropertyStoreString(pStore, PKEY_Link_TargetParsingPath);
+        if (!TheAppId.IsEmpty())
+            FillJumpListMenu(hMenu, pjld.get(), TheAppId);
+    }
+
+    return pjld.release();
+}
+
+void DoJumpListMenu(HWND hWnd, JumpListData* pData, int id)
+{
+    std::unique_ptr<JumpListData> to_delete(pData);
+
+    if (id > 0 && id <= pData->objects.size())
+    {
+        CComPtr<IUnknown> pUnknown(pData->objects[id - pData->minid]);
+
+        CComQIPtr<IShellItem> pItem(pUnknown);
+        if (pItem)
+        {
+            CComPtr<IContextMenu> pContextMenu;
+            CHECK_HR(pItem->BindToHandler(nullptr, BHID_SFUIObject, IID_PPV_ARGS(&pContextMenu)));
+            if (pContextMenu)
+                OpenDefaultItem(hWnd, pContextMenu);
+        }
+
+        CComQIPtr<IShellLink> pLink(pUnknown);
+        if (pLink)
+        {
+            CComQIPtr<IContextMenu> pContextMenu(pLink);
+
+            CComQIPtr<IPropertyStore> pStore(pLink);
+            const CString params = GetPropertyStoreString(pStore, PKEY_AppUserModel_ActivationContext);
+            const CString appId = GetPropertyStoreString(pStore, PKEY_AppUserModel_ID);
+            if (!appId.IsEmpty())
+            {
+                CComPtr<IShellItem2> target;
+                if (SUCCEEDED(SHCreateItemInKnownFolder(FOLDERID_AppsFolder, 0, appId, IID_PPV_ARGS(&target))))
+                {
+                    ULONG modern = 0;
+                    if (SUCCEEDED(target->GetUInt32(PKEY_AppUserModel_HostEnvironment, &modern)) && modern)
+                    {
+                        CComQIPtr<IContextMenu> targetMenu;
+                        if (SUCCEEDED(target->BindToHandler(nullptr, BHID_SFUIObject, IID_PPV_ARGS(&targetMenu))))
+                        {
+                            pContextMenu = targetMenu;
+                        }
+                    }
+                }
+            }
+
+            if (pContextMenu)
+                OpenDefaultItem(hWnd, pContextMenu, params);
+        }
+    }
+}
+
+int JumpListMenuGetIcon(JumpListData* pData, int id)
+{
+    if (id > 0 && id <= pData->objects.size())
+    {
+        CComPtr<IUnknown> pUnknown(pData->objects[id - pData->minid]);
+        CComQIPtr<IShellItem> pItem(pUnknown);
+        if (pItem)
+            return GetIconIndex(pItem);
+
+    }
+
+    return -1;
+}

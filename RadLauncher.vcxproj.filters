@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="src\RadLauncher.cpp" />
+    <ClCompile Include="src\WinMain.cpp" />
+    <ClCompile Include="src\JumpListMenu.cpp" />
+    <ClCompile Include="src\ShellUtils.cpp" />
+    <ClCompile Include="src\ImageUtils.cpp" />
+    <ClCompile Include="src\JumpList.cpp" />
+    <ClCompile Include="src\Rad\Dialog.cpp">
+      <Filter>Rad</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rad\Log.cpp">
+      <Filter>Rad</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rad\ListViewPlus.c">
+      <Filter>Rad</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rad\MessageHandler.cpp">
+      <Filter>Rad</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rad\Window.cpp">
+      <Filter>Rad</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rad\WinError.cpp">
+      <Filter>Rad</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rad\WindowsPlus.c">
+      <Filter>Rad</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\JumpList.h" />
+    <ClInclude Include="src\ShellUtils.h" />
+    <ClInclude Include="src\ImageUtils.h" />
+    <ClInclude Include="src\WindowsUtils.h" />
+    <ClInclude Include="src\JumpListMenu.h" />
+    <ClInclude Include="src\Rad\Dialog.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\Format.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\Log.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\ListViewPlus.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\MemoryPlus.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\MessageHandler.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\Window.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\SourceLocation.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\WinError.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\Windowxx.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rad\WindowsPlus.h">
+      <Filter>Rad</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="src\manifest.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Rad">
+      <UniqueIdentifier>{eb15ec27-b143-414f-9b05-7ed9e037ce9b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

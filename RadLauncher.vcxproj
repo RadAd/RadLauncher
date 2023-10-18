@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{CA6B743D-E356-4051-97F3-9B1EA88F21F2}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="RadVSProps\Windows.props" />
+    <Import Project="RadVSProps\Configuration.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WINVER=0x0605;_WIN32_WINNT=0x0A00;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Manifest>
+      <AdditionalManifestFiles>src\manifest.xml</AdditionalManifestFiles>
+    </Manifest>
+    <Link>
+      <AdditionalDependencies>propsys.lib;Comctl32.lib;Msimg32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PreprocessorDefinitions>WINVER=0x0605;_WIN32_WINNT=0x0A00;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Manifest>
+      <AdditionalManifestFiles>src\manifest.xml</AdditionalManifestFiles>
+    </Manifest>
+    <Link>
+      <AdditionalDependencies>propsys.lib;Comctl32.lib;Msimg32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>WINVER=0x0605;_WIN32_WINNT=0x0A00;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Manifest>
+      <AdditionalManifestFiles>src\manifest.xml</AdditionalManifestFiles>
+    </Manifest>
+    <Link>
+      <AdditionalDependencies>propsys.lib;Comctl32.lib;Msimg32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PreprocessorDefinitions>WINVER=0x0605;_WIN32_WINNT=0x0A00;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Manifest>
+      <AdditionalManifestFiles>src\manifest.xml</AdditionalManifestFiles>
+    </Manifest>
+    <Link>
+      <AdditionalDependencies>propsys.lib;Comctl32.lib;Msimg32.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="src\ImageUtils.cpp" />
+    <ClCompile Include="src\JumpList.cpp" />
+    <ClCompile Include="src\JumpListMenu.cpp" />
+    <ClCompile Include="src\RadLauncher.cpp" />
+    <ClCompile Include="src\Rad\Dialog.cpp" />
+    <ClCompile Include="src\Rad\ListViewPlus.c" />
+    <ClCompile Include="src\Rad\Log.cpp" />
+    <ClCompile Include="src\Rad\MessageHandler.cpp" />
+    <ClCompile Include="src\Rad\Window.cpp" />
+    <ClCompile Include="src\Rad\WindowsPlus.c" />
+    <ClCompile Include="src\Rad\WinError.cpp" />
+    <ClCompile Include="src\ShellUtils.cpp" />
+    <ClCompile Include="src\WinMain.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\ImageUtils.h" />
+    <ClInclude Include="src\JumpListMenu.h" />
+    <ClInclude Include="src\ShellUtils.h" />
+    <ClInclude Include="src\JumpList.h" />
+    <ClInclude Include="src\Rad\Dialog.h" />
+    <ClInclude Include="src\Rad\Format.h" />
+    <ClInclude Include="src\Rad\ListViewPlus.h" />
+    <ClInclude Include="src\Rad\Log.h" />
+    <ClInclude Include="src\Rad\MemoryPlus.h" />
+    <ClInclude Include="src\Rad\MessageHandler.h" />
+    <ClInclude Include="src\Rad\SourceLocation.h" />
+    <ClInclude Include="src\Rad\Window.h" />
+    <ClInclude Include="src\Rad\WindowsPlus.h" />
+    <ClInclude Include="src\Rad\Windowxx.h" />
+    <ClInclude Include="src\Rad\WinError.h" />
+    <ClInclude Include="src\WindowsUtils.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="src\manifest.xml" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
