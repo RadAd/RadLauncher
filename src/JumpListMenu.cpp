@@ -242,7 +242,7 @@ void FillJumpListMenu(HMENU hMenu, JumpListData* pjld, LPCWSTR pAppId)
             CHECK_HR(m_pAutoList10b->Initialize(pAppId, NULL, NULL));
     }
 
-    DoList(data, m_pAutoList, m_pAutoList10b, TYPE_PINNED);
+    DoList(data, m_pAutoList, m_pAutoList10b, TYPE_PINNED); // TODO Remove Pinned items from recent list
 
     CComPtr<IDestinationList> pCustomList;
     {

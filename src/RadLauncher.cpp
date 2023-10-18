@@ -24,6 +24,12 @@
 
 #define HK_OPEN                 1
 
+bool IsDigit(WCHAR ch)
+{
+    WORD type;
+    return GetStringTypeW(CT_CTYPE1, &ch, 1, &type) && (type & C1_DIGIT);
+}
+
 class RootWindow : public Window
 {
     friend WindowManager<RootWindow>;
@@ -409,7 +415,15 @@ void RootWindow::Refresh()
     {
         CStrRet pName;
         CHECK_HR(m_pFolder->GetDisplayNameOf(pIdList, 0, &pName));
-        CString name = pName.toStr(pIdList);
+        const CString name = pName.toStr(pIdList);
+        // Remove leading digits followed by '.'
+        int nameoffset = 0;
+        while (nameoffset < name.GetLength() && IsDigit(name[nameoffset]))
+            ++nameoffset;
+        if (name[nameoffset] == TEXT('.'))
+            ++nameoffset;
+        else
+            nameoffset = 0;
 
         int nIconIndex = 0;
         CHECK_HR(pShellIcon->GetIconOf(pIdList, GIL_FORSHELL, &nIconIndex));
@@ -418,7 +432,7 @@ void RootWindow::Refresh()
             LVGROUP lvg = { sizeof(LVGROUP) };
             lvg.mask = LVGF_HEADER | LVGF_GROUPID | LVGF_STATE | LVGF_TITLEIMAGE;
             lvg.state = LVGS_COLLAPSIBLE;
-            lvg.pszHeader = const_cast<LPWSTR>(LPCWSTR(name));
+            lvg.pszHeader = const_cast<LPWSTR>(LPCWSTR(name) + nameoffset);
             lvg.iTitleImage = nIconIndex;
             lvg.iGroupId = ++iGroupId;
             CHECK(ListView_InsertGroup(m_hWndChild, -1, &lvg) >= 0);
@@ -440,7 +454,7 @@ void RootWindow::Refresh()
 
                 CStrRet pChildName;
                 CHECK_HR(pChildShellFolder->GetDisplayNameOf(pChildIdList, 0, &pChildName));
-                CString childname = pChildName.toStr(pChildIdList);
+                const CString childname = pChildName.toStr(pChildIdList);
 
                 int nChildIconIndex = 0;
                 CHECK_HR(pChildShellIcon->GetIconOf(pChildIdList, GIL_FORSHELL, &nChildIconIndex));
