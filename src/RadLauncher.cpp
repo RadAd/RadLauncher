@@ -101,7 +101,8 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
     ListView_SetTextBkColor(m_hWndChild, QueryRegDWORDValue(reg, TEXT("textbkcolor"), RGB(61, 61, 61)));
     //ListView_SetOutlineColor(m_hWndChild, QueryRegDWORDValue(reg, TEXT("outlinekcolor"), RGB(255, 0, 255)));
 
-    const CString folderspec = IsDebuggerPresent() ? LR"(%__APPDIR__%..\..\Menu)" : RegQueryStringValue(reg, TEXT("folder"), TEXT(R"(%LOCALAPPDATA%\)") APPNAME TEXT(R"(\Menu)"));
+    //const CString folderspec = IsDebuggerPresent() ? LR"(%__APPDIR__%..\..\Menu)" : RegQueryStringValue(reg, TEXT("folder"), TEXT(R"(%LOCALAPPDATA%\)") APPNAME TEXT(R"(\Menu)"));
+    const CString folderspec = RegQueryStringValue(reg, TEXT("folder"), TEXT(R"(%LOCALAPPDATA%\)") APPNAME TEXT(R"(\Menu)"));
     const CString folder = PathCanonicalize(ExpandEnvironmentStrings(folderspec));
 
     CComPtr<IShellFolder> pDesktopFolder;
@@ -372,6 +373,13 @@ void RootWindow::Refresh()
         return;
 
     ListView_DeleteAllItems(m_hWndChild);
+    while (ListView_GetGroupCount(m_hWndChild) > 0)
+    {
+        LVGROUP lvg = { sizeof(LVGROUP) };
+        lvg.mask = LVGF_GROUPID;
+        ListView_GetGroupInfoByIndex(m_hWndChild, 0, &lvg);
+        ListView_RemoveGroup(m_hWndChild, lvg.iGroupId);
+    }
 
     CComQIPtr<IShellIcon> pShellIcon(m_pFolder);
 
