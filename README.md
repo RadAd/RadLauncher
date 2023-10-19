@@ -1,5 +1,5 @@
-<!-- ![Icon](res/RadLauncher.ico) RadLauncher -->
-<img src="res/RadLauncher.ico" width=32/> RadLauncher
+<!-- ![Icon](res/RadLaunch.ico) RadLauncher -->
+<img src="res/RadLaunch.ico" width=32/> RadLauncher
 ==========
 
 Start menu alternative
