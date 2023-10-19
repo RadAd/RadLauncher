@@ -14,13 +14,16 @@
 #define ID_VIEW_TILES                   40007
 #define ID_VIEW_VIEW                    40008
 #define ID_MAIN_REFRESH                 40009
+#define ID_MAIN_COLLAPSEALLGROUPS       40012
+#define ID_MAIN_EXPANDALLGROUPS         40013
+#define ID_ACCELERATOR40016             40016
 
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        104
-#define _APS_NEXT_COMMAND_VALUE         40012
+#define _APS_NEXT_COMMAND_VALUE         40018
 #define _APS_NEXT_CONTROL_VALUE         1001
 #define _APS_NEXT_SYMED_VALUE           101
 #endif

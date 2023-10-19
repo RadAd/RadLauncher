@@ -109,6 +109,7 @@ void OpenInExplorer(IShellFolder* pFolder)
     CHECK_HR(pwb.CoCreateInstance(CLSID_ShellBrowserWindow, nullptr, CLSCTX_LOCAL_SERVER));
 
     CHECK_HR(CoAllowSetForegroundWindow(pwb, 0));
+    CHECK_RET(pwb, void());
 
     CComVariant varTarget;
     CHECK_HR(InitVariantFromBuffer(spidl, ILGetSize(spidl), &varTarget));

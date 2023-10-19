@@ -127,7 +127,7 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
     ListView_SetImageList(m_hWndChild, hImageListLg, LVSIL_NORMAL);
     ListView_SetImageList(m_hWndChild, hImageListSm, LVSIL_SMALL);
     ListView_SetGroupHeaderImageList(m_hWndChild, hImageListSm);
-    ListView_SetIconSpacing(m_hWndChild, 80, 0);
+    //ListView_SetIconSpacing(m_hWndChild, 80, 0);
     ListView_SetExtendedListViewStyle(m_hWndChild, LVS_EX_TWOCLICKACTIVATE);
     //ListView_SetView(m_hWndChild, LV_VIEW_ICON);
 
@@ -488,6 +488,30 @@ void RootWindow::OnCommand(int id, HWND hWndCtl, UINT codeNotify)
     case ID_MAIN_REFRESH:
         Refresh();
         break;
+    case ID_MAIN_COLLAPSEALLGROUPS:
+    {
+        const UINT count = (UINT) ListView_GetGroupCount(m_hWndChild);
+        for (UINT i = 0; i < count; ++i)
+        {
+            LVGROUP lvg = { sizeof(LVGROUP) };
+            lvg.mask = LVGF_GROUPID | LVGF_STATE;
+            ListView_GetGroupInfoByIndex(m_hWndChild, i, &lvg);
+            ListView_SetGroupState(m_hWndChild, lvg.iGroupId, LVGS_COLLAPSED, LVGS_COLLAPSED);
+        }
+        break;
+    }
+    case ID_MAIN_EXPANDALLGROUPS:
+    {
+        const UINT count = (UINT) ListView_GetGroupCount(m_hWndChild);
+        for (UINT i = 0; i < count; ++i)
+        {
+            LVGROUP lvg = { sizeof(LVGROUP) };
+            lvg.mask = LVGF_GROUPID | LVGF_STATE;
+            ListView_GetGroupInfoByIndex(m_hWndChild, i, &lvg);
+            ListView_SetGroupState(m_hWndChild, lvg.iGroupId, LVGS_COLLAPSED, 0);
+        }
+        break;
+    }
     }
 }
 
