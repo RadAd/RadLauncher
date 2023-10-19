@@ -7,6 +7,7 @@
 
 HINSTANCE g_hInstance = NULL;
 HACCEL g_hAccelTable = NULL;
+HWND g_hWndAccel = NULL;
 HWND g_hWndDlg = NULL;
 
 bool Run(_In_ const LPCTSTR lpCmdLine, _In_ const int nShowCmd);
@@ -18,7 +19,7 @@ int DoMessageLoop()
     {
 
         if ((g_hWndDlg == NULL || !IsDialogMessage(g_hWndDlg, &msg))
-            && (g_hAccelTable == NULL || !TranslateAccelerator(msg.hwnd, g_hAccelTable, &msg)))
+            && (g_hAccelTable == NULL || !TranslateAccelerator(g_hWndAccel, g_hAccelTable, &msg)))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);

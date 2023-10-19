@@ -17,6 +17,8 @@
 #include "..\resource.h"
 
 extern HINSTANCE g_hInstance;
+extern HACCEL g_hAccelTable;
+extern HWND g_hWndAccel;
 
 #define APPNAME TEXT("RadLauncher")
 #define APPNAMEA "RadLauncher"
@@ -66,6 +68,7 @@ private:
     LRESULT OnNotify(const DWORD dwID, const LPNMHDR pNmHdr);
     void OnContextMenu(HWND hWndContext, UINT xPos, UINT yPos);
     void OnHotKey(int idHotKey, UINT fuModifiers, UINT vk);
+    void OnActivate(UINT state, HWND hWndActDeact, BOOL fMinimized);
     void OnInitMenuPopup(HMENU hMenu, UINT item, BOOL fSystemMenu);
     void OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem);
     void OnDrawItem(const DRAWITEMSTRUCT* lpDrawItem);
@@ -208,10 +211,6 @@ LRESULT RootWindow::OnNotify(const DWORD dwID, const LPNMHDR pNmHdr)
                     OpenInExplorer(m_pFolder);
                 break;
 
-            case VK_F5:
-                Refresh();
-                break;
-
             case VK_ESCAPE:
                 ShowWindow(*this, SW_HIDE);
                 break;
@@ -306,6 +305,20 @@ void RootWindow::OnHotKey(int idHotKey, UINT fuModifiers, UINT vk)
         SetForegroundWindow(*this);
         ShowWindow(*this, SW_SHOWNORMAL);
         break;
+    }
+}
+
+void RootWindow::OnActivate(UINT state, HWND hWndActDeact, BOOL fMinimized)
+{
+    if (state == WA_INACTIVE)
+    {
+        g_hWndAccel = NULL;
+        g_hAccelTable = NULL;
+    }
+    else
+    {
+        g_hWndAccel = *this;
+        g_hAccelTable = LoadAccelerators(g_hInstance, MAKEINTRESOURCE(IDR_ACCELERATOR1));
     }
 }
 
@@ -439,46 +452,33 @@ void RootWindow::OnCommand(int id, HWND hWndCtl, UINT codeNotify)
     switch (id)
     {
     case ID_VIEW_EXTRA:
-    {
-        const HIMAGELIST hImageListLg = MyGetImageList(SHIL_JUMBO);
-        ListView_SetImageList(m_hWndChild, hImageListLg, LVSIL_NORMAL);
+        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_JUMBO), LVSIL_NORMAL);
         ListView_SetView(m_hWndChild, LV_VIEW_ICON);
         break;
-    }
     case ID_VIEW_LARGEICONS:
-    {
-        const HIMAGELIST hImageListLg = MyGetImageList(SHIL_EXTRALARGE);
-        ListView_SetImageList(m_hWndChild, hImageListLg, LVSIL_NORMAL);
+        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_EXTRALARGE), LVSIL_NORMAL);
         ListView_SetView(m_hWndChild, LV_VIEW_ICON);
         break;
-    }
     case ID_VIEW_MEDIUM:
-    {
-        const HIMAGELIST hImageListLg = MyGetImageList(SHIL_LARGE);
-        ListView_SetImageList(m_hWndChild, hImageListLg, LVSIL_NORMAL);
+        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_LARGE), LVSIL_NORMAL);
         ListView_SetView(m_hWndChild, LV_VIEW_ICON);
         break;
-    }
     case ID_VIEW_SMALLICONS:
-    {
         ListView_SetView(m_hWndChild, LV_VIEW_SMALLICON);
         break;
-    }
     case ID_VIEW_LIST:
-    {
         ListView_SetView(m_hWndChild, LV_VIEW_LIST);
         break;
-    }
     case ID_VIEW_DETAILS:
-    {
         ListView_SetView(m_hWndChild, LV_VIEW_DETAILS);
         break;
-    }
     case ID_VIEW_TILES:
-    {
+        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_EXTRALARGE), LVSIL_NORMAL);
         ListView_SetView(m_hWndChild, LV_VIEW_TILE);
         break;
-    }
+    case ID_MAIN_REFRESH:
+        Refresh();
+        break;
     }
 }
 
@@ -494,6 +494,7 @@ LRESULT RootWindow::HandleMessage(const UINT uMsg, const WPARAM wParam, const LP
         HANDLE_MSG(WM_NOTIFY, OnNotify);
         HANDLE_MSG(WM_CONTEXTMENU, OnContextMenu);
         HANDLE_MSG(WM_HOTKEY, OnHotKey);
+        HANDLE_MSG(WM_ACTIVATE, OnActivate);
 
         HANDLE_MSG(WM_INITMENUPOPUP, OnInitMenuPopup);
         HANDLE_MSG(WM_MEASUREITEM, OnMeasureItem);
@@ -521,6 +522,9 @@ void RootWindow::Refresh()
         ListView_GetGroupInfoByIndex(m_hWndChild, 0, &lvg);
         ListView_RemoveGroup(m_hWndChild, lvg.iGroupId);
     }
+
+    ListView_AddColumn(m_hWndChild, TEXT("Name"), LVCFMT_LEFT, 200);
+
 
     CComQIPtr<IShellIcon> pShellIcon(m_pFolder);
 
