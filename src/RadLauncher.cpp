@@ -62,6 +62,7 @@ protected:
 
 private:
     BOOL OnCreate(LPCREATESTRUCT lpCreateStruct);
+    void OnClose();
     void OnDestroy();
     void OnSize(UINT state, int cx, int cy);
     void OnSetFocus(HWND hwndOldFocus);
@@ -156,6 +157,14 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
     //::SendMessage(*this, WM_SETHOTKEY, MAKEWORD('L', HOTKEYF_CONTROL | HOTKEYF_ALT), 0);
 
     return TRUE;
+}
+
+void RootWindow::OnClose()
+{
+    if (GetKeyState(VK_SHIFT) & KF_UP)
+        SetHandled(false);
+    else
+        ShowWindow(*this, SW_HIDE);
 }
 
 void RootWindow::OnDestroy()
@@ -488,6 +497,7 @@ LRESULT RootWindow::HandleMessage(const UINT uMsg, const WPARAM wParam, const LP
     switch (uMsg)
     {
         HANDLE_MSG(WM_CREATE, OnCreate);
+        HANDLE_MSG(WM_CLOSE, OnClose);
         HANDLE_MSG(WM_DESTROY, OnDestroy);
         HANDLE_MSG(WM_SIZE, OnSize);
         HANDLE_MSG(WM_SETFOCUS, OnSetFocus);
