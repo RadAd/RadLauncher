@@ -7,12 +7,16 @@
 #include "Rad/WindowsPlus.h"
 
 #include <ShlObj.h>
+#include <shellapi.h>
+#include <commoncontrols.h>
 
 #include "ShellUtils.h"
 #include "WindowsUtils.h"
 #include "JumpListMenu.h"
 
 #include "..\resource.h"
+
+extern HINSTANCE g_hInstance;
 
 #define APPNAME TEXT("RadLauncher")
 #define APPNAMEA "RadLauncher"
@@ -25,6 +29,15 @@
 #define ID_LIST                         101
 
 #define HK_OPEN                 1
+
+
+HIMAGELIST MyGetImageList(int imagelist)
+{
+    IImageList* pImageList = nullptr;
+    SHGetImageList(imagelist, IID_IImageList, (void**) &pImageList);
+    return (HIMAGELIST) pImageList;
+}
+
 
 bool IsDigit(WCHAR ch)
 {
@@ -56,6 +69,7 @@ private:
     void OnInitMenuPopup(HMENU hMenu, UINT item, BOOL fSystemMenu);
     void OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem);
     void OnDrawItem(const DRAWITEMSTRUCT* lpDrawItem);
+    void OnCommand(int id, HWND hWndCtl, UINT codeNotify);
 
     static LPCTSTR ClassName() { return APPNAME; }
 
@@ -276,6 +290,11 @@ void RootWindow::OnContextMenu(HWND hWndContext, UINT xPos, UINT yPos)
                 m_pjld = nullptr;
             }
         }
+        else
+        {
+            const auto hMenu = MakeUniqueHandle(LoadPopupMenu(g_hInstance, IDR_MENU1), DestroyMenu);
+            TrackPopupMenu(hMenu.get(), TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON, xPos, yPos, 0, *this, nullptr);
+        }
     }
 }
 
@@ -292,6 +311,43 @@ void RootWindow::OnHotKey(int idHotKey, UINT fuModifiers, UINT vk)
 
 void RootWindow::OnInitMenuPopup(HMENU hMenu, UINT item, BOOL fSystemMenu)
 {
+    if (!fSystemMenu)
+    {
+        UINT id = GetMenuItemID(hMenu, 0);
+        if (id == ID_VIEW_EXTRA)
+        {
+            UINT cmd = 0;
+            UINT view = ListView_GetView(m_hWndChild);
+            switch (view)
+            {
+            case LV_VIEW_ICON:
+            {
+                HIMAGELIST hImageList = ListView_GetImageList(m_hWndChild, LVSIL_NORMAL);
+                if (hImageList == MyGetImageList(SHIL_JUMBO))
+                    cmd = ID_VIEW_EXTRA;
+                else if (hImageList == MyGetImageList(SHIL_EXTRALARGE))
+                    cmd = ID_VIEW_LARGEICONS;
+                else if (hImageList == MyGetImageList(SHIL_LARGE))
+                    cmd = ID_VIEW_MEDIUM;
+                break;
+            }
+            case LV_VIEW_SMALLICON:
+                cmd = ID_VIEW_SMALLICONS;
+                break;
+            case LV_VIEW_LIST:
+                cmd = ID_VIEW_LIST;
+                break;
+            case LV_VIEW_DETAILS:
+                cmd = ID_VIEW_DETAILS;
+                break;
+            case LV_VIEW_TILE:
+                cmd = ID_VIEW_TILES;
+                break;
+            }
+
+            CheckMenuRadioItem(hMenu, ID_VIEW_EXTRA, ID_VIEW_TILES, cmd, MF_BYCOMMAND);
+        }
+    }
 }
 
 void RootWindow::OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem)
@@ -378,6 +434,54 @@ void RootWindow::OnDrawItem(const DRAWITEMSTRUCT* lpDrawItem)
     }
 }
 
+void RootWindow::OnCommand(int id, HWND hWndCtl, UINT codeNotify)
+{
+    switch (id)
+    {
+    case ID_VIEW_EXTRA:
+    {
+        const HIMAGELIST hImageListLg = MyGetImageList(SHIL_JUMBO);
+        ListView_SetImageList(m_hWndChild, hImageListLg, LVSIL_NORMAL);
+        ListView_SetView(m_hWndChild, LV_VIEW_ICON);
+        break;
+    }
+    case ID_VIEW_LARGEICONS:
+    {
+        const HIMAGELIST hImageListLg = MyGetImageList(SHIL_EXTRALARGE);
+        ListView_SetImageList(m_hWndChild, hImageListLg, LVSIL_NORMAL);
+        ListView_SetView(m_hWndChild, LV_VIEW_ICON);
+        break;
+    }
+    case ID_VIEW_MEDIUM:
+    {
+        const HIMAGELIST hImageListLg = MyGetImageList(SHIL_LARGE);
+        ListView_SetImageList(m_hWndChild, hImageListLg, LVSIL_NORMAL);
+        ListView_SetView(m_hWndChild, LV_VIEW_ICON);
+        break;
+    }
+    case ID_VIEW_SMALLICONS:
+    {
+        ListView_SetView(m_hWndChild, LV_VIEW_SMALLICON);
+        break;
+    }
+    case ID_VIEW_LIST:
+    {
+        ListView_SetView(m_hWndChild, LV_VIEW_LIST);
+        break;
+    }
+    case ID_VIEW_DETAILS:
+    {
+        ListView_SetView(m_hWndChild, LV_VIEW_DETAILS);
+        break;
+    }
+    case ID_VIEW_TILES:
+    {
+        ListView_SetView(m_hWndChild, LV_VIEW_TILE);
+        break;
+    }
+    }
+}
+
 LRESULT RootWindow::HandleMessage(const UINT uMsg, const WPARAM wParam, const LPARAM lParam)
 {
     LRESULT ret = 0;
@@ -394,6 +498,8 @@ LRESULT RootWindow::HandleMessage(const UINT uMsg, const WPARAM wParam, const LP
         HANDLE_MSG(WM_INITMENUPOPUP, OnInitMenuPopup);
         HANDLE_MSG(WM_MEASUREITEM, OnMeasureItem);
         HANDLE_MSG(WM_DRAWITEM, OnDrawItem);
+
+        HANDLE_MSG(WM_COMMAND, OnCommand);
     }
 
     if (!IsHandled())
