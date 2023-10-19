@@ -96,6 +96,7 @@
     <ClCompile Include="src\WinMain.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="resource.h" />
     <ClInclude Include="src\ImageUtils.h" />
     <ClInclude Include="src\JumpListMenu.h" />
     <ClInclude Include="src\ShellUtils.h" />
@@ -115,6 +116,12 @@
   </ItemGroup>
   <ItemGroup>
     <Xml Include="src\manifest.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="RadLauncher.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="res\RadLaunch.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

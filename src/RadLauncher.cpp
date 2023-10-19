@@ -12,6 +12,8 @@
 #include "WindowsUtils.h"
 #include "JumpListMenu.h"
 
+#include "..\resource.h"
+
 #define APPNAME TEXT("RadLauncher")
 #define APPNAMEA "RadLauncher"
 #define APPNAMEW L"RadLauncher"
@@ -38,7 +40,9 @@ public:
     static RootWindow* Create() { return WindowManager<RootWindow>::Create(); }
 
 protected:
+    static void GetWndClass(WNDCLASS& wc);
     static void GetCreateWindow(CREATESTRUCT& cs);
+
     LRESULT HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam) override;
 
 private:
@@ -64,11 +68,17 @@ private:
     JumpListData* m_pjld = nullptr;
 };
 
+void RootWindow::GetWndClass(WNDCLASS& wc)
+{
+    Window::GetWndClass(wc);
+    wc.hIcon = LoadIcon(wc.hInstance, MAKEINTRESOURCE(IDI_ICON1));
+}
+
 void RootWindow::GetCreateWindow(CREATESTRUCT& cs)
 {
     Window::GetCreateWindow(cs);
     cs.lpszName = APPNAME;
-    cs.style = WS_OVERLAPPEDWINDOW;
+    cs.style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME;
     cs.dwExStyle |= WS_EX_TOOLWINDOW;
 
     CRegKey reg;
@@ -101,6 +111,7 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
     ListView_SetGroupHeaderImageList(m_hWndChild, hImageListSm);
     ListView_SetIconSpacing(m_hWndChild, 80, 0);
     ListView_SetExtendedListViewStyle(m_hWndChild, LVS_EX_TWOCLICKACTIVATE);
+    //ListView_SetView(m_hWndChild, LV_VIEW_ICON);
 
     ListView_SetBkColor(m_hWndChild, QueryRegDWORDValue(reg, TEXT("bkcolor"), RGB(0, 0, 0)));
     ListView_SetTextColor(m_hWndChild, QueryRegDWORDValue(reg, TEXT("textcolor"), RGB(250, 250, 250)));
