@@ -51,6 +51,7 @@ class RootWindow : public Window
 {
     friend WindowManager<RootWindow>;
 public:
+    static bool IsExisting() { return FindWindow(ClassName(), nullptr) != NULL; }
     static ATOM Register() { return WindowManager<RootWindow>::Register(); }
     static RootWindow* Create() { return WindowManager<RootWindow>::Create(); }
 
@@ -84,6 +85,8 @@ private:
     HWND m_hWndChild = NULL;
     HIMAGELIST m_hImageListMenu = NULL;
     JumpListData* m_pjld = nullptr;
+
+    bool m_HideOnLaunch = false;
 };
 
 void RootWindow::GetWndClass(WNDCLASS& wc)
@@ -153,7 +156,7 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
 
     Refresh();
 
-    RegisterHotKey(*this, HK_OPEN, MOD_CONTROL | MOD_ALT, 'L');
+    CHECK(RegisterHotKey(*this, HK_OPEN, MOD_CONTROL | MOD_ALT, 'L'));
     //::SendMessage(*this, WM_SETHOTKEY, MAKEWORD('L', HOTKEYF_CONTROL | HOTKEYF_ALT), 0);
 
     return TRUE;
@@ -161,7 +164,7 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
 
 void RootWindow::OnClose()
 {
-    if (GetKeyState(VK_SHIFT) & KF_UP)
+    if (!m_HideOnLaunch || GetKeyState(VK_SHIFT) & KF_UP)
         SetHandled(false);
     else
         ShowWindow(*this, SW_HIDE);
@@ -221,7 +224,8 @@ LRESULT RootWindow::OnNotify(const DWORD dwID, const LPNMHDR pNmHdr)
                 break;
 
             case VK_ESCAPE:
-                ShowWindow(*this, SW_HIDE);
+                if (m_HideOnLaunch)
+                    ShowWindow(*this, SW_HIDE);
                 break;
             }
             break;
@@ -249,7 +253,8 @@ LRESULT RootWindow::OnNotify(const DWORD dwID, const LPNMHDR pNmHdr)
                 if (pContextMenu)
                 {
                     OpenDefaultItem(*this, pContextMenu);
-                    ShowWindow(*this, SW_HIDE);
+                    if (m_HideOnLaunch)
+                        ShowWindow(*this, SW_HIDE);
                 }
             }
             break;
@@ -336,7 +341,9 @@ void RootWindow::OnInitMenuPopup(HMENU hMenu, UINT item, BOOL fSystemMenu)
     if (!fSystemMenu)
     {
         UINT id = GetMenuItemID(hMenu, 0);
-        if (id == ID_VIEW_EXTRA)
+        switch (id)
+        {
+        case ID_VIEW_EXTRA:
         {
             UINT cmd = 0;
             UINT view = ListView_GetView(m_hWndChild);
@@ -368,6 +375,12 @@ void RootWindow::OnInitMenuPopup(HMENU hMenu, UINT item, BOOL fSystemMenu)
             }
 
             CheckMenuRadioItem(hMenu, ID_VIEW_EXTRA, ID_VIEW_TILES, cmd, MF_BYCOMMAND);
+        }
+        break;
+
+        case ID_SETTINGS_HIDEONLAUNCH:
+            CheckMenuItem(hMenu, ID_SETTINGS_HIDEONLAUNCH, MF_BYCOMMAND | (m_HideOnLaunch ? MF_CHECKED : MF_UNCHECKED));
+            break;
         }
     }
 }
@@ -512,6 +525,9 @@ void RootWindow::OnCommand(int id, HWND hWndCtl, UINT codeNotify)
         }
         break;
     }
+    case ID_SETTINGS_HIDEONLAUNCH:
+        m_HideOnLaunch = !m_HideOnLaunch;
+        break;
     }
 }
 
@@ -631,6 +647,12 @@ void RootWindow::Refresh()
 
 bool Run(_In_ const LPCTSTR lpCmdLine, _In_ const int nShowCmd)
 {
+    if (RootWindow::IsExisting())
+    {
+        MessageBox(NULL, TEXT("Process already exists."), APPNAME, MB_ICONERROR | MB_OK);
+        return false;
+    }
+
     RadLogInitWnd(NULL, APPNAMEA, APPNAMEW);
 
     if (true)
