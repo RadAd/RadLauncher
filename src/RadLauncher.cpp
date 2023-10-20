@@ -86,7 +86,7 @@ private:
     HIMAGELIST m_hImageListMenu = NULL;
     JumpListData* m_pjld = nullptr;
 
-    bool m_HideOnLaunch = false;
+    bool m_HideOnLaunch = true;
 };
 
 void RootWindow::GetWndClass(WNDCLASS& wc)
