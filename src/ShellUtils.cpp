@@ -23,7 +23,7 @@ void DumpPropertyStore(IPropertyStore* pStore)
         CHECK_HR(pStore->GetAt(i, &key));
 
         TCHAR strkey[1024];
-        CHECK(PSStringFromPropertyKey(key, strkey, ARRAYSIZE(strkey)));
+        CHECK_HR(PSStringFromPropertyKey(key, strkey, ARRAYSIZE(strkey)));
 
         PROPVARIANT val = {};
         PropVariantInit(&val);
