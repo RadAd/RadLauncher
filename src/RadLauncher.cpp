@@ -32,18 +32,18 @@ extern HWND g_hWndAccel;
 
 #define HK_OPEN                 1
 
-
-HIMAGELIST MyGetImageList(int imagelist)
+HIMAGELIST MyGetImageList(int imagelist, SrcLoc src)
 {
     IImageList* pImageList = nullptr;
-    SHGetImageList(imagelist, IID_IImageList, (void**) &pImageList);
+    //CHECK_HR(SHGetImageList(imagelist, IID_PPV_ARGS(&pImageList)));
+    if (FAILED(g_radloghr = SHGetImageList(imagelist, IID_PPV_ARGS(&pImageList))))
+        RadLog(LOG_ASSERT, WinError::getMessage(g_radloghr, nullptr, TEXT(__FUNCTION__)), src);
     return (HIMAGELIST) pImageList;
 }
 
-
 bool IsDigit(WCHAR ch)
 {
-    WORD type;
+    WORD type = {};
     return GetStringTypeW(CT_CTYPE1, &ch, 1, &type) && (type & C1_DIGIT);
 }
 
@@ -124,14 +124,14 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
     CRegKey reg;
     reg.Open(HKEY_CURRENT_USER, TEXT(R"(Software\RadSoft\)") APPNAME);
 
-    m_hWndChild = ListView_Create(*this, RECT(), WS_CHILD | WS_VISIBLE | LVS_ALIGNTOP | LVS_ICON | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE, LVS_EX_FLATSB, ID_LIST);
-    _ASSERT(m_hWndChild);
+    m_hWndChild = ListView_Create(*this, RECT(), WS_CHILD | WS_VISIBLE | LVS_ALIGNTOP | LVS_ICON | LVS_SINGLESEL | LVS_SHAREIMAGELISTS | LVS_AUTOARRANGE, LVS_EX_FLATSB | LVS_EX_TWOCLICKACTIVATE, ID_LIST);
+    CHECK_LE(m_hWndChild);
     CHECK(ListView_EnableGroupView(m_hWndChild, TRUE) >= 0);
     ListView_SetImageList(m_hWndChild, hImageListLg, LVSIL_NORMAL);
     ListView_SetImageList(m_hWndChild, hImageListSm, LVSIL_SMALL);
     ListView_SetGroupHeaderImageList(m_hWndChild, hImageListSm);
     //ListView_SetIconSpacing(m_hWndChild, 80, 0);
-    ListView_SetExtendedListViewStyle(m_hWndChild, LVS_EX_TWOCLICKACTIVATE);
+    //ListView_SetExtendedListViewStyle(m_hWndChild, LVS_EX_TWOCLICKACTIVATE);
     //ListView_SetView(m_hWndChild, LV_VIEW_ICON);
 
     ListView_SetBkColor(m_hWndChild, QueryRegDWORDValue(reg, TEXT("bkcolor"), RGB(0, 0, 0)));
@@ -150,13 +150,13 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
     //CHECK_HR(SHGetKnownFolderIDList(FOLDERID_Programs, KF_FLAG_DEFAULT, NULL, &pIdList));
     //CHECK_HR(SHGetKnownFolderIDList(FOLDERID_CommonPrograms, KF_FLAG_DEFAULT, NULL, &pIdList));
     if (FAILED(SHParseDisplayName(folder, nullptr, &pIdList, 0, nullptr)))
-        MessageBox(*this, Format(TEXT("Unable to open folder \"%s\""), LPCWSTR(folder)).c_str(), APPNAME, MB_ICONERROR | MB_OK);
+        MessageBox(*this, Format(TEXT("Unable to open folder \"%s\""), folder.GetString()).c_str(), APPNAME, MB_ICONERROR | MB_OK);
     else
         CHECK_HR(pDesktopFolder->BindToObject(pIdList, nullptr, IID_PPV_ARGS(&m_pFolder)));
 
     Refresh();
 
-    CHECK(RegisterHotKey(*this, HK_OPEN, MOD_CONTROL | MOD_ALT, 'L'));
+    CHECK_LE(RegisterHotKey(*this, HK_OPEN, MOD_CONTROL | MOD_ALT, 'L'));
     //::SendMessage(*this, WM_SETHOTKEY, MAKEWORD('L', HOTKEYF_CONTROL | HOTKEYF_ALT), 0);
 
     return TRUE;
@@ -178,7 +178,7 @@ void RootWindow::OnDestroy()
     if (reg)
     {
         RECT rc = {};
-        GetWindowRect(*this, &rc);
+        CHECK_LE(GetWindowRect(*this, &rc));
 
         reg.SetDWORDValue(TEXT("x"), rc.left);
         reg.SetDWORDValue(TEXT("y"), rc.top);
@@ -276,13 +276,13 @@ void RootWindow::OnContextMenu(HWND hWndContext, UINT xPos, UINT yPos)
             ListView_GetNextItemIndex(m_hWndChild, &item, LVNI_SELECTED);
 
             POINT pt = { LONG(xPos), LONG(yPos) };
-            if (pt.x == UINT_MAX && pt.y == UINT_MAX)
+            if (xPos == UINT_MAX && yPos == UINT_MAX)
             {
                 RECT rc = {};
                 ListView_GetItemRect(m_hWndChild, item.iItem, &rc, LVIR_SELECTBOUNDS);
                 pt.x = rc.right;
                 pt.y = rc.top;
-                ClientToScreen(m_hWndChild, &pt);
+                CHECK_LE(ClientToScreen(m_hWndChild, &pt));
             }
 
             IShellItem* pChildShellItem = (IShellItem*) ListView_GetItemParam(m_hWndChild, item.iItem);
@@ -340,23 +340,23 @@ void RootWindow::OnInitMenuPopup(HMENU hMenu, UINT item, BOOL fSystemMenu)
 {
     if (!fSystemMenu)
     {
-        UINT id = GetMenuItemID(hMenu, 0);
+        const UINT id = GetMenuItemID(hMenu, 0);
         switch (id)
         {
         case ID_VIEW_EXTRA:
         {
             UINT cmd = 0;
-            UINT view = ListView_GetView(m_hWndChild);
+            const UINT view = ListView_GetView(m_hWndChild);
             switch (view)
             {
             case LV_VIEW_ICON:
             {
                 HIMAGELIST hImageList = ListView_GetImageList(m_hWndChild, LVSIL_NORMAL);
-                if (hImageList == MyGetImageList(SHIL_JUMBO))
+                if (hImageList == MyGetImageList(SHIL_JUMBO, SRC_LOC))
                     cmd = ID_VIEW_EXTRA;
-                else if (hImageList == MyGetImageList(SHIL_EXTRALARGE))
+                else if (hImageList == MyGetImageList(SHIL_EXTRALARGE, SRC_LOC))
                     cmd = ID_VIEW_LARGEICONS;
-                else if (hImageList == MyGetImageList(SHIL_LARGE))
+                else if (hImageList == MyGetImageList(SHIL_LARGE, SRC_LOC))
                     cmd = ID_VIEW_MEDIUM;
                 break;
             }
@@ -405,7 +405,7 @@ void RootWindow::OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem)
             if (hIcon != NULL)
             {
                 ICONINFO ii = {};
-                CHECK(GetIconInfo(hIcon, &ii));
+                CHECK_LE(GetIconInfo(hIcon, &ii));
                 BITMAP bm = {};
                 GetObject(ii.hbmColor, sizeof(bm), &bm);
                 DeleteObject(ii.hbmColor);
@@ -420,10 +420,9 @@ void RootWindow::OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem)
         {
             LPCTSTR s = (LPCTSTR) lpMeasureItem->itemData;
 
-            HDC hDC = GetDC(*this);
+            const auto hDC = AutoGetDC(*this);
             SIZE sz = {};
-            GetTextExtentPoint32(hDC, s, (int) _tcslen(s), &sz);
-            ReleaseDC(*this, hDC);
+            CHECK_LE(GetTextExtentPoint32(hDC.get(), s, (int) _tcslen(s), &sz));
 
             lpMeasureItem->itemWidth += sz.cx;
             lpMeasureItem->itemHeight = std::max<UINT>(lpMeasureItem->itemHeight, sz.cy);
@@ -458,13 +457,11 @@ void RootWindow::OnDrawItem(const DRAWITEMSTRUCT* lpDrawItem)
         {
             static HFONT hFontBold = CreateBoldFont((HFONT) GetCurrentObject(lpDrawItem->hDC, OBJ_FONT));
 
-            HFONT hOldFont = (HFONT) SelectObject(lpDrawItem->hDC, hFontBold);
+            const auto AutoFont = AutoSelectObject(lpDrawItem->hDC, hFontBold);
 
             LPCTSTR s = (LPCTSTR) lpDrawItem->itemData;
             RECT rc = lpDrawItem->rcItem;
             DrawText(lpDrawItem->hDC, s, -1, &rc, DT_LEFT | DT_VCENTER);
-
-            SelectObject(lpDrawItem->hDC, hOldFont);
         }
     }
 }
@@ -474,15 +471,15 @@ void RootWindow::OnCommand(int id, HWND hWndCtl, UINT codeNotify)
     switch (id)
     {
     case ID_VIEW_EXTRA:
-        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_JUMBO), LVSIL_NORMAL);
+        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_JUMBO, SRC_LOC), LVSIL_NORMAL);
         ListView_SetView(m_hWndChild, LV_VIEW_ICON);
         break;
     case ID_VIEW_LARGEICONS:
-        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_EXTRALARGE), LVSIL_NORMAL);
+        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_EXTRALARGE, SRC_LOC), LVSIL_NORMAL);
         ListView_SetView(m_hWndChild, LV_VIEW_ICON);
         break;
     case ID_VIEW_MEDIUM:
-        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_LARGE), LVSIL_NORMAL);
+        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_LARGE, SRC_LOC), LVSIL_NORMAL);
         ListView_SetView(m_hWndChild, LV_VIEW_ICON);
         break;
     case ID_VIEW_SMALLICONS:
@@ -495,7 +492,7 @@ void RootWindow::OnCommand(int id, HWND hWndCtl, UINT codeNotify)
         ListView_SetView(m_hWndChild, LV_VIEW_DETAILS);
         break;
     case ID_VIEW_TILES:
-        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_EXTRALARGE), LVSIL_NORMAL);
+        ListView_SetImageList(m_hWndChild, MyGetImageList(SHIL_EXTRALARGE, SRC_LOC), LVSIL_NORMAL);
         ListView_SetView(m_hWndChild, LV_VIEW_TILE);
         break;
     case ID_MAIN_REFRESH:
@@ -609,7 +606,7 @@ void RootWindow::Refresh()
             CHECK(ListView_InsertGroup(m_hWndChild, -1, &lvg) >= 0);
         }
 
-        CComQIPtr<IShellFolder> pChildShellFolder;
+        CComPtr<IShellFolder> pChildShellFolder;
         CHECK_HR(m_pFolder->BindToObject(pIdList, nullptr, IID_PPV_ARGS(&pChildShellFolder)));
         if (pChildShellFolder)
         {
