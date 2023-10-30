@@ -11,6 +11,7 @@
 
 #include "Rad/Log.h"
 #include "Rad/MemoryPlus.h"
+#include "Rad/Format.h"
 
 void DumpPropertyStore(IPropertyStore* pStore)
 {
@@ -21,11 +22,17 @@ void DumpPropertyStore(IPropertyStore* pStore)
         PROPERTYKEY key = {};
         CHECK_HR(pStore->GetAt(i, &key));
 
+        TCHAR strkey[1024];
+        CHECK(PSStringFromPropertyKey(key, strkey, ARRAYSIZE(strkey)));
+
         PROPVARIANT val = {};
         PropVariantInit(&val);
         CHECK_HR(pStore->GetValue(key, &val));
 
-        // TODO Print out key and val
+        TCHAR strval[1024];
+        PropVariantToString(val, strval, ARRAYSIZE(strval));
+
+        OutputDebugString(Format(TEXT("%s = %s\n"), strkey, strval).c_str());
 
         CHECK_HR(PropVariantClear(&val));
     }

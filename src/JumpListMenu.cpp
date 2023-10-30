@@ -76,6 +76,7 @@ void DoCollection(Data& data, IObjectCollection* pCollection)
                 if (pLink)
                 {
                     CComQIPtr<IPropertyStore> pStore(pLink);
+                    //DumpPropertyStore(pStore);
 
                     BOOL bSeparator = GetPropertyStoreBool(pStore, PKEY_AppUserModel_IsDestListSeparator);
                     if (bSeparator)
@@ -118,10 +119,17 @@ void DoCollection(Data& data, IObjectCollection* pCollection)
                                 ULONG modern = 0;
                                 if (SUCCEEDED(target->GetUInt32(PKEY_AppUserModel_HostEnvironment, &modern)) && modern)
                                 {
+#if 0
                                     CComPtr<IPropertyStore> pStore3;
-                                    target->BindToHandler(NULL, BHID_PropertyStore, IID_IPropertyStore, (void**) &pStore3);
+                                    target->BindToHandler(NULL, BHID_PropertyStore, IID_PPV_ARGS(&pStore3));
+                                    //DumpPropertyStore(pStore3);
 
                                     packageName = GetPropertyStoreString(pStore3, PKEY_MetroPackageName);
+#else
+                                    CComHeapPtr<WCHAR> pn;
+                                    if (SUCCEEDED(target->GetString(PKEY_MetroPackageName, &pn)))
+                                        packageName = pn;
+#endif
                                 }
                             }
                         }
