@@ -19,6 +19,7 @@
 #include <shellapi.h>
 
 #include <map>
+#include <set>
 
 template<class K, class V>
 const V& GetOr(const std::map<K, V>& map, const K& k, const V& v = {})
@@ -52,7 +53,17 @@ struct Data
     LPCWSTR pAppId;
 };
 
-void DoCollection(Data& data, IObjectCollection* pCollection)
+struct CompareIShellItem
+{
+    bool operator()(IShellItem* p1, IShellItem* p2) const
+    {
+        int order = 0;
+        p1->Compare(p2, SICHINT_ALLFIELDS, &order);
+        return order < 0;
+    }
+};
+
+void DoCollection(Data& data, IObjectCollection* pCollection, std::set<IShellItem*, CompareIShellItem>& ignore)
 {
     UINT count;
     if (SUCCEEDED(pCollection->GetCount(&count)))
@@ -63,8 +74,10 @@ void DoCollection(Data& data, IObjectCollection* pCollection)
             if (SUCCEEDED(pCollection->GetAt(i, IID_PPV_ARGS(&pUnknown))) && pUnknown)
             {
                 CComQIPtr<IShellItem> pItem(pUnknown);
-                if (pItem)
+                if (pItem && (ignore.find(pItem) == ignore.end()))
                 {
+                    ignore.insert(pItem);
+
                     CComHeapPtr<WCHAR> pName;
                     CHECK_HR(pItem->GetDisplayName(SIGDN_NORMALDISPLAY, &pName));
                     AppendMenu(data.hMenu, MF_STRING | MF_ENABLED, data.id++, pName);
@@ -184,7 +197,7 @@ void DoCollection(Data& data, IObjectCollection* pCollection)
     }
 }
 
-void DoCollection(Data& data, IObjectCollection* pCollection, CategoryType listType)
+void DoCollection(Data& data, IObjectCollection* pCollection, CategoryType listType, std::set<IShellItem*, CompareIShellItem>& ignore)
 {
     UINT count = 0;
     CHECK_HR(pCollection->GetCount(&count));
@@ -193,11 +206,11 @@ void DoCollection(Data& data, IObjectCollection* pCollection, CategoryType listT
     {
         static LPCWSTR names[] = { L"Pinned", L"Recent", L"Frequent" };
         AppendMenuHeader(data.hMenu, names[listType]);
-        DoCollection(data, pCollection);
+        DoCollection(data, pCollection, ignore);
     }
 }
 
-void DoList(Data& data, IAutomaticDestinationList* m_pAutoList, IAutomaticDestinationList10b* m_pAutoList10b, CategoryType listType)
+void DoList(Data& data, IAutomaticDestinationList* m_pAutoList, IAutomaticDestinationList10b* m_pAutoList10b, CategoryType listType, std::set<IShellItem*, CompareIShellItem>& ignore)
 {
     BOOL bHasList = FALSE;
     if (m_pAutoList)
@@ -215,18 +228,18 @@ void DoList(Data& data, IAutomaticDestinationList* m_pAutoList, IAutomaticDestin
         if (m_pAutoList10b)
             m_pAutoList10b->GetList(listType, maxCount, 1, IID_PPV_ARGS(&pCollection));
 
-        DoCollection(data, pCollection, listType);
+        DoCollection(data, pCollection, listType, ignore);
     }
 }
 
-void DoCustomList(Data& data, IDestinationList* pCustomList, UINT index, LPCWSTR name)
+void DoCustomList(Data& data, IDestinationList* pCustomList, UINT index, LPCWSTR name, std::set<IShellItem*, CompareIShellItem>& ignore)
 {
     AppendMenuHeader(data.hMenu, name);
 
     CComPtr<IObjectCollection> pCollection;
     CHECK_HR(pCustomList->EnumerateCategoryDestinations(index, IID_PPV_ARGS(&pCollection)));
 
-    DoCollection(data, pCollection);
+    DoCollection(data, pCollection, ignore);
 }
 
 void FillJumpListMenu(HMENU hMenu, JumpListData* pjld, LPCWSTR pAppId)
@@ -250,7 +263,8 @@ void FillJumpListMenu(HMENU hMenu, JumpListData* pjld, LPCWSTR pAppId)
             CHECK_HR(m_pAutoList10b->Initialize(pAppId, NULL, NULL));
     }
 
-    DoList(data, m_pAutoList, m_pAutoList10b, TYPE_PINNED); // TODO Remove Pinned items from recent list
+    std::set<IShellItem*, CompareIShellItem> ignore;
+    DoList(data, m_pAutoList, m_pAutoList10b, TYPE_PINNED, ignore);
 
     CComPtr<IDestinationList> pCustomList;
     {
@@ -281,14 +295,14 @@ void FillJumpListMenu(HMENU hMenu, JumpListData* pjld, LPCWSTR pAppId)
                 switch (category.type)
                 {
                 case 0:
-                    DoCustomList(data, pCustomList, catIndex, LoadIndirectString(category.name));
+                    DoCustomList(data, pCustomList, catIndex, LoadIndirectString(category.name), ignore);
                     CoTaskMemFree(category.name);
                     break;
 
                 case 1:
                     // category.subType 1 == "Frequent"
                     // category.subType 2 == "Recent"
-                    DoList(data, m_pAutoList, m_pAutoList10b, CategoryType(3 - category.subType));
+                    DoList(data, m_pAutoList, m_pAutoList10b, CategoryType(3 - category.subType), ignore);
                     break;
 
                 case 2:
@@ -304,11 +318,11 @@ void FillJumpListMenu(HMENU hMenu, JumpListData* pjld, LPCWSTR pAppId)
         }
 
         if (tasks != -1)
-            DoCustomList(data, pCustomList, tasks, L"Tasks");
+            DoCustomList(data, pCustomList, tasks, L"Tasks", ignore);
     }
 
     if (categoryCount == 0)
-        DoList(data, m_pAutoList, m_pAutoList10b, TYPE_RECENT);
+        DoList(data, m_pAutoList, m_pAutoList10b, TYPE_RECENT, ignore);
 }
 
 JumpListData* FillJumpListMenu(HMENU hMenu, IShellItem* pShellItem)
