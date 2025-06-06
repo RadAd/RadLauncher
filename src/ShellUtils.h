@@ -29,4 +29,5 @@ public:
     CString toStr(_In_opt_ PCUITEMID_CHILD pidl) const;
 };
 
+int GetIconIndex(IShellFolder* pFolder, const ITEMID_CHILD* pIdList);
 int GetIconIndex(IShellItem* pShellItem);

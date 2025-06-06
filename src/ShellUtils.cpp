@@ -157,6 +157,29 @@ CString CStrRet::toStr(_In_opt_ PCUITEMID_CHILD pidl) const
     return s;
 }
 
+int GetIconIndex(IShellFolder* pFolder, const ITEMID_CHILD* pIdList)
+{
+    CComQIPtr<IShellIcon> pShellIcon(pFolder);
+    int nIconIndex = 0;
+    if (pShellIcon)
+    {
+        CHECK_HR(pShellIcon->GetIconOf(pIdList, GIL_FORSHELL, &nIconIndex));
+    }
+    else
+    {
+        CComPtr<IShellItem> pShellItem;
+        CHECK_HR(SHCreateShellItem(nullptr, pFolder, pIdList, &pShellItem));
+
+        CComHeapPtr<ITEMIDLIST> pAbsoluteIdList;
+        SHGetIDListFromObject(pShellItem, &pAbsoluteIdList);
+        SHFILEINFO sfi;
+        HIMAGELIST himl = (HIMAGELIST)SHGetFileInfo(reinterpret_cast<LPCTSTR>((ITEMIDLIST*)pAbsoluteIdList), 0, &sfi, sizeof(sfi), SHGFI_PIDL | SHGFI_SYSICONINDEX);
+        if (himl)
+            nIconIndex = sfi.iIcon;
+    }
+    return nIconIndex;
+}
+
 int GetIconIndex(IShellItem* pShellItem)
 {
     CComQIPtr<IParentAndItem> pParentAndItem(pShellItem);
@@ -165,8 +188,5 @@ int GetIconIndex(IShellItem* pShellItem)
     CComHeapPtr<ITEMIDLIST> pIdList;
     pParentAndItem->GetParentAndItem(nullptr, &pFolder, &pIdList);
 
-    CComQIPtr<IShellIcon> pShellIcon(pFolder);
-    int nIconIndex = 0;
-    CHECK_HR(pShellIcon->GetIconOf(pIdList, GIL_FORSHELL, &nIconIndex));
-    return nIconIndex;
+    return GetIconIndex(pFolder, pIdList);
 }

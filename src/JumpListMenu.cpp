@@ -204,7 +204,7 @@ void DoCollection(Data& data, IObjectCollection* pCollection, CategoryType listT
 
     if (count > 0)
     {
-        static LPCWSTR names[] = { L"Pinned", L"Recent", L"Frequent" };
+        static LPCWSTR names[] = { L"Pinned", L"Recent", L"Frequent", L"Other1", L"Other2" };
         AppendMenuHeader(data.hMenu, names[listType]);
         DoCollection(data, pCollection, ignore);
     }
@@ -226,9 +226,10 @@ void DoList(Data& data, IAutomaticDestinationList* m_pAutoList, IAutomaticDestin
         if (m_pAutoList)
             m_pAutoList->GetList(listType, maxCount, IID_PPV_ARGS(&pCollection));
         if (m_pAutoList10b)
-            m_pAutoList10b->GetList(listType, maxCount, 1, IID_PPV_ARGS(&pCollection));
+            m_pAutoList10b->GetList(listType, maxCount, 0, IID_PPV_ARGS(&pCollection));
 
-        DoCollection(data, pCollection, listType, ignore);
+        if (pCollection)
+            DoCollection(data, pCollection, listType, ignore);
     }
 }
 
@@ -342,18 +343,30 @@ JumpListData* FillJumpListMenu(HMENU hMenu, IShellItem* pShellItem)
     }
 
     CComHeapPtr<WCHAR> pAppId;
-    if (SUCCEEDED(pAppResolver->GetAppIDForShortcut(pShellItem, &pAppId)))
+
+    CComPtr<IShellLink> pShellLink;
+    if (SUCCEEDED(pShellItem->BindToHandler(nullptr, BHID_SFUIObject, IID_PPV_ARGS(&pShellLink))))
     {
-        FillJumpListMenu(hMenu, pjld.get(), pAppId);
+        if (SUCCEEDED(pAppResolver->GetAppIDForShortcut(pShellItem, &pAppId)))
+        {
+            FillJumpListMenu(hMenu, pjld.get(), pAppId);
+        }
+        else
+        {
+            CComPtr<IPropertyStore> pStore;
+            CHECK_HR(pShellItem->BindToHandler(NULL, BHID_PropertyStore, IID_PPV_ARGS(&pStore)));
+
+            CString TheAppId = GetPropertyStoreString(pStore, PKEY_Link_TargetParsingPath);
+            if (!TheAppId.IsEmpty())
+                FillJumpListMenu(hMenu, pjld.get(), TheAppId);
+        }
     }
     else
     {
-        CComPtr<IPropertyStore> pStore;
-        CHECK_HR(pShellItem->BindToHandler(NULL, BHID_PropertyStore, IID_PPV_ARGS(&pStore)));
-
-        CString TheAppId = GetPropertyStoreString(pStore, PKEY_Link_TargetParsingPath);
-        if (!TheAppId.IsEmpty())
-            FillJumpListMenu(hMenu, pjld.get(), TheAppId);
+        if (SUCCEEDED(pShellItem->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &pAppId)))
+        {
+            FillJumpListMenu(hMenu, pjld.get(), pAppId);
+        }
     }
 
     return pjld.release();

@@ -81,6 +81,7 @@ private:
     void Refresh();
 
     CComPtr<IShellFolder> m_pFolder;
+    int m_iFolderIcon = 0;
     //LPITEMIDLIST m_pIdList;
     HWND m_hWndChild = NULL;
     HIMAGELIST m_hImageListMenu = NULL;
@@ -142,6 +143,7 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
     //const CString folderspec = IsDebuggerPresent() ? LR"(%__APPDIR__%..\..\Menu)" : RegQueryStringValue(reg, TEXT("folder"), TEXT(R"(%LOCALAPPDATA%\)") APPNAME TEXT(R"(\Menu)"));
     const CString folderspec = RegQueryStringValue(reg, TEXT("folder"), TEXT(R"(%LOCALAPPDATA%\)") APPNAME TEXT(R"(\Menu)"));
     const CString folder = PathCanonicalize(ExpandEnvironmentStrings(folderspec));
+    //const CString folder = TEXT("shell:appsfolder");
 
     CComPtr<IShellFolder> pDesktopFolder;
     CHECK_HR(SHGetDesktopFolder(&pDesktopFolder));
@@ -153,6 +155,7 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
         MessageBox(*this, Format(TEXT("Unable to open folder \"%s\""), folder.GetString()).c_str(), APPNAME, MB_ICONERROR | MB_OK);
     else
         CHECK_HR(pDesktopFolder->BindToObject(pIdList, nullptr, IID_PPV_ARGS(&m_pFolder)));
+    m_iFolderIcon = GetIconIndex(pDesktopFolder, pIdList);
 
     Refresh();
 
@@ -572,12 +575,20 @@ void RootWindow::Refresh()
 
     ListView_AddColumn(m_hWndChild, TEXT("Name"), LVCFMT_LEFT, 200);
 
-
-    CComQIPtr<IShellIcon> pShellIcon(m_pFolder);
+    int iGroupId = 0;
+    {
+        LVGROUP lvg = { sizeof(LVGROUP) };
+        lvg.mask = LVGF_HEADER | LVGF_GROUPID | LVGF_STATE | LVGF_TITLEIMAGE;
+        lvg.state = LVGS_COLLAPSIBLE;
+        lvg.pszHeader = const_cast<LPWSTR>(L"Folder");
+        lvg.iTitleImage = m_iFolderIcon;
+        lvg.iGroupId = ++iGroupId;
+        CHECK(ListView_InsertGroup(m_hWndChild, -1, &lvg) >= 0);
+    }
+    const int iMainGroupId = iGroupId;
 
     CComPtr<IEnumIDList> pEnumIDList;
     CHECK_HR(m_pFolder->EnumObjects(*this, SHCONTF_FOLDERS | SHCONTF_INIT_ON_FIRST_NEXT, &pEnumIDList));
-    int iGroupId = 0;
     CComHeapPtr<ITEMIDLIST> pIdList;
     while (pIdList.Free(), pEnumIDList->Next(1, &pIdList, nullptr) == S_OK)
     {
@@ -593,24 +604,22 @@ void RootWindow::Refresh()
         else
             nameoffset = 0;
 
-        int nIconIndex = 0;
-        CHECK_HR(pShellIcon->GetIconOf(pIdList, GIL_FORSHELL, &nIconIndex));
-
-        {
-            LVGROUP lvg = { sizeof(LVGROUP) };
-            lvg.mask = LVGF_HEADER | LVGF_GROUPID | LVGF_STATE | LVGF_TITLEIMAGE;
-            lvg.state = LVGS_COLLAPSIBLE;
-            lvg.pszHeader = const_cast<LPWSTR>(LPCWSTR(name) + nameoffset);
-            lvg.iTitleImage = nIconIndex;
-            lvg.iGroupId = ++iGroupId;
-            CHECK(ListView_InsertGroup(m_hWndChild, -1, &lvg) >= 0);
-        }
+        int nIconIndex = GetIconIndex(m_pFolder, pIdList);
 
         CComPtr<IShellFolder> pChildShellFolder;
-        CHECK_HR(m_pFolder->BindToObject(pIdList, nullptr, IID_PPV_ARGS(&pChildShellFolder)));
-        if (pChildShellFolder)
+        /*CHECK_HR(m_pFolder->BindToObject(pIdList, nullptr, IID_PPV_ARGS(&pChildShellFolder)))*/;
+        //if (pChildShellFolder)
+        if (SUCCEEDED(m_pFolder->BindToObject(pIdList, nullptr, IID_PPV_ARGS(&pChildShellFolder))))
         {
-            CComQIPtr<IShellIcon> pChildShellIcon(pChildShellFolder);
+            {
+                LVGROUP lvg = { sizeof(LVGROUP) };
+                lvg.mask = LVGF_HEADER | LVGF_GROUPID | LVGF_STATE | LVGF_TITLEIMAGE;
+                lvg.state = LVGS_COLLAPSIBLE;
+                lvg.pszHeader = const_cast<LPWSTR>(LPCWSTR(name) + nameoffset);
+                lvg.iTitleImage = nIconIndex;
+                lvg.iGroupId = ++iGroupId;
+                CHECK(ListView_InsertGroup(m_hWndChild, -1, &lvg) >= 0);
+            }
 
             CComPtr<IEnumIDList> pChildEnumIDList;
             CHECK_HR(pChildShellFolder->EnumObjects(*this, SHCONTF_NONFOLDERS | SHCONTF_INIT_ON_FIRST_NEXT, &pChildEnumIDList));
@@ -624,8 +633,7 @@ void RootWindow::Refresh()
                 CHECK_HR(pChildShellFolder->GetDisplayNameOf(pChildIdList, 0, &pChildName));
                 const CString childname = pChildName.toStr(pChildIdList);
 
-                int nChildIconIndex = 0;
-                CHECK_HR(pChildShellIcon->GetIconOf(pChildIdList, GIL_FORSHELL, &nChildIconIndex));
+                int nChildIconIndex = GetIconIndex(pChildShellFolder, pChildIdList);
 
                 {
                     LVITEM item = {};
@@ -637,6 +645,22 @@ void RootWindow::Refresh()
                     item.lParam = (LPARAM) pChildShellItem.Detach();
                     ListView_InsertItem(m_hWndChild, &item);
                 }
+            }
+        }
+        else
+        {
+            CComPtr<IShellItem> pShellItem;
+            CHECK_HR(SHCreateShellItem(nullptr, m_pFolder, pIdList, &pShellItem));
+
+            {
+                LVITEM item = {};
+                item.iItem = INT_MAX;
+                item.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_GROUPID | LVIF_PARAM;
+                item.pszText = const_cast<LPWSTR>(LPCWSTR(name));
+                item.iImage = nIconIndex;
+                item.iGroupId = iMainGroupId;
+                item.lParam = (LPARAM)pShellItem.Detach();
+                ListView_InsertItem(m_hWndChild, &item);
             }
         }
     }
