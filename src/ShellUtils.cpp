@@ -48,6 +48,7 @@ CString GetPropertyStoreString(IPropertyStore* pStore, REFPROPERTYKEY key)
         switch (val.vt)
         {
         case VT_EMPTY:
+        case VT_NULL:
             break;
 
         case VT_LPWSTR: case VT_BSTR:

@@ -303,6 +303,8 @@ void RootWindow::OnContextMenu(HWND hWndContext, UINT xPos, UINT yPos)
                 m_pjld = pjld;
                 int id = TrackPopupMenu(hMenu.get(), TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y, 0, *this, nullptr);
                 DoJumpListMenu(*this, pjld, id);
+                if (id > 0 && m_HideOnLaunch)
+                    ShowWindow(*this, SW_HIDE);
                 m_pjld = nullptr;
             }
         }
