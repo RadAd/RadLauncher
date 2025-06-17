@@ -99,6 +99,7 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="src\ImageUtils.h" />
     <ClInclude Include="src\JumpListMenu.h" />
+    <ClInclude Include="src\JumpListMenuHandler.h" />
     <ClInclude Include="src\ShellUtils.h" />
     <ClInclude Include="src\JumpList.h" />
     <ClInclude Include="src\Rad\Dialog.h" />

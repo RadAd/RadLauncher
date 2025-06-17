@@ -69,6 +69,7 @@
       <Filter>Rad</Filter>
     </ClInclude>
     <ClInclude Include="resource.h" />
+    <ClInclude Include="src\JumpListMenuHandler.h" />
   </ItemGroup>
   <ItemGroup>
     <Xml Include="src\manifest.xml" />

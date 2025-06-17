@@ -38,20 +38,32 @@ inline CString PathCanonicalize(LPCTSTR s)
     return r;
 }
 
-inline void SetMenuItemBitmap(_In_ HMENU hMenu, _In_ UINT item, _In_ BOOL fByPosition, _In_ HBITMAP hBitmap)
+inline BOOL SetMenuItemBitmap(_In_ HMENU hMenu, _In_ UINT item, _In_ BOOL fByPosition, _In_ HBITMAP hBitmap)
 {
     MENUITEMINFO minfo;
     minfo.cbSize = sizeof(minfo);
     minfo.fMask = MIIM_BITMAP;
     minfo.hbmpItem = hBitmap;
-    SetMenuItemInfo(hMenu, item, fByPosition, &minfo);
+    return SetMenuItemInfo(hMenu, item, fByPosition, &minfo);
 }
 
-inline void SetMenuItemData(_In_ HMENU hMenu, _In_ UINT item, _In_ BOOL fByPosition, _In_ ULONG_PTR dwItemData)
+inline BOOL SetMenuItemData(_In_ HMENU hMenu, _In_ UINT item, _In_ BOOL fByPosition, _In_ ULONG_PTR dwItemData)
 {
     MENUITEMINFO minfo;
     minfo.cbSize = sizeof(minfo);
     minfo.fMask = MIIM_DATA;
     minfo.dwItemData = dwItemData;
-    SetMenuItemInfo(hMenu, item, fByPosition, &minfo);
+    return SetMenuItemInfo(hMenu, item, fByPosition, &minfo);
+}
+
+inline BOOL GetMenuItemData(_In_ HMENU hMenu, _In_ UINT item, _In_ BOOL fByPosition, _Out_ ULONG_PTR& dwItemData)
+{
+    dwItemData = 0;
+    MENUITEMINFO minfo;
+    minfo.cbSize = sizeof(minfo);
+    minfo.fMask = MIIM_DATA;
+    if (!GetMenuItemInfo(hMenu, item, fByPosition, &minfo))
+        return FALSE;
+    dwItemData = minfo.dwItemData;
+    return TRUE;
 }

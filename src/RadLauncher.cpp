@@ -13,6 +13,7 @@
 #include "ShellUtils.h"
 #include "WindowsUtils.h"
 #include "JumpListMenu.h"
+#include "JumpListMenuHandler.h"
 
 #include "..\resource.h"
 
@@ -38,7 +39,7 @@ HIMAGELIST MyGetImageList(int imagelist, SrcLoc src)
     //CHECK_HR(SHGetImageList(imagelist, IID_PPV_ARGS(&pImageList)));
     if (FAILED(g_radloghr = SHGetImageList(imagelist, IID_PPV_ARGS(&pImageList))))
         RadLog(LOG_ASSERT, WinError::getMessage(g_radloghr, nullptr, TEXT(__FUNCTION__)), src);
-    return (HIMAGELIST) pImageList;
+    return IImageListToHIMAGELIST(pImageList);
 }
 
 bool IsDigit(WCHAR ch)
@@ -72,8 +73,6 @@ private:
     void OnHotKey(int idHotKey, UINT fuModifiers, UINT vk);
     void OnActivate(UINT state, HWND hWndActDeact, BOOL fMinimized);
     void OnInitMenuPopup(HMENU hMenu, UINT item, BOOL fSystemMenu);
-    void OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem);
-    void OnDrawItem(const DRAWITEMSTRUCT* lpDrawItem);
     void OnCommand(int id, HWND hWndCtl, UINT codeNotify);
 
     static LPCTSTR ClassName() { return APPNAME; }
@@ -84,8 +83,8 @@ private:
     int m_iFolderIcon = 0;
     //LPITEMIDLIST m_pIdList;
     HWND m_hWndChild = NULL;
-    HIMAGELIST m_hImageListMenu = NULL;
-    JumpListData* m_pjld = nullptr;
+
+    JumpListMenuHandler m_jlmh;
 
     bool m_HideOnLaunch = true;
 };
@@ -119,8 +118,6 @@ BOOL RootWindow::OnCreate(const LPCREATESTRUCT lpCreateStruct)
 {
     HIMAGELIST hImageListLg, hImageListSm;
     CHECK(Shell_GetImageLists(&hImageListLg, &hImageListSm));
-
-    m_hImageListMenu = hImageListSm;
 
     CRegKey reg;
     reg.Open(HKEY_CURRENT_USER, TEXT(R"(Software\RadSoft\)") APPNAME);
@@ -291,21 +288,8 @@ void RootWindow::OnContextMenu(HWND hWndContext, UINT xPos, UINT yPos)
             IShellItem* pChildShellItem = (IShellItem*) ListView_GetItemParam(m_hWndChild, item.iItem);
             if (pChildShellItem != nullptr)
             {
-                const auto hMenu = MakeUniqueHandle(CreatePopupMenu(), DestroyMenu);
-
-                MENUINFO mnfo;
-                mnfo.cbSize = sizeof(mnfo);
-                mnfo.fMask = MIM_STYLE;
-                mnfo.dwStyle = MNS_CHECKORBMP | MNS_AUTODISMISS;
-                SetMenuInfo(hMenu.get(), &mnfo);
-
-                JumpListData* pjld = FillJumpListMenu(hMenu.get(), pChildShellItem);
-                m_pjld = pjld;
-                int id = TrackPopupMenu(hMenu.get(), TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y, 0, *this, nullptr);
-                DoJumpListMenu(*this, pjld, id);
-                if (id > 0 && m_HideOnLaunch)
+                if (m_jlmh.DoJumpListMenu(*this, pChildShellItem, pt) && m_HideOnLaunch)
                     ShowWindow(*this, SW_HIDE);
-                m_pjld = nullptr;
             }
         }
         else
@@ -390,87 +374,6 @@ void RootWindow::OnInitMenuPopup(HMENU hMenu, UINT item, BOOL fSystemMenu)
     }
 }
 
-void RootWindow::OnMeasureItem(MEASUREITEMSTRUCT* lpMeasureItem)
-{
-    if (lpMeasureItem->CtlID == 0 || lpMeasureItem->CtlType == ODT_MENU)
-    {
-        if (m_hImageListMenu && m_pjld)
-        {
-            const int index = JumpListMenuGetSystemIcon(m_pjld, lpMeasureItem->itemID);
-            if (index >= 0)
-            {
-                int cx = 0, cy = 0;
-                CHECK(ImageList_GetIconSize(m_hImageListMenu, &cx, &cy));
-
-                lpMeasureItem->itemWidth = std::max(lpMeasureItem->itemWidth, UINT(cx));
-                lpMeasureItem->itemHeight = std::max(lpMeasureItem->itemHeight, UINT(cy));
-            }
-
-            const HICON hIcon = JumpListMenuGetIcon(m_pjld, lpMeasureItem->itemID);
-            if (hIcon != NULL)
-            {
-                ICONINFO ii = {};
-                CHECK_LE(GetIconInfo(hIcon, &ii));
-                BITMAP bm = {};
-                GetObject(ii.hbmColor, sizeof(bm), &bm);
-                DeleteObject(ii.hbmColor);
-                DeleteObject(ii.hbmMask);
-
-                lpMeasureItem->itemWidth = std::max(lpMeasureItem->itemWidth, UINT(bm.bmWidth));
-                lpMeasureItem->itemHeight = std::max(lpMeasureItem->itemHeight, UINT(bm.bmHeight));
-            }
-        }
-
-        if (lpMeasureItem->itemData)
-        {
-            LPCTSTR s = (LPCTSTR) lpMeasureItem->itemData;
-
-            const auto hDC = AutoGetDC(*this);
-            SIZE sz = {};
-            CHECK_LE(GetTextExtentPoint32(hDC.get(), s, (int) _tcslen(s), &sz));
-
-            lpMeasureItem->itemWidth += sz.cx;
-            lpMeasureItem->itemHeight = std::max<UINT>(lpMeasureItem->itemHeight, sz.cy);
-        }
-    }
-}
-
-HFONT CreateBoldFont(HFONT hFont)
-{
-    LOGFONT lf = {};
-    GetObject(hFont, sizeof(LOGFONT), &lf);
-    lf.lfWeight = FW_BOLD;
-    return CreateFontIndirect(&lf);
-}
-
-void RootWindow::OnDrawItem(const DRAWITEMSTRUCT* lpDrawItem)
-{
-    if (lpDrawItem->CtlID == 0 || lpDrawItem->CtlType == ODT_MENU)
-    {
-        if (m_hImageListMenu && m_pjld)
-        {
-            const int index = JumpListMenuGetSystemIcon(m_pjld, lpDrawItem->itemID);
-            if (index >= 0)
-                CHECK(ImageList_Draw(m_hImageListMenu, index, lpDrawItem->hDC, lpDrawItem->rcItem.left, lpDrawItem->rcItem.top, ILD_TRANSPARENT | (lpDrawItem->itemState & ODA_SELECT ? ILD_SELECTED : ILD_NORMAL)));
-
-            const HICON hIcon = JumpListMenuGetIcon(m_pjld, lpDrawItem->itemID);
-            if (hIcon != NULL)
-                DrawIconEx(lpDrawItem->hDC, lpDrawItem->rcItem.left, lpDrawItem->rcItem.top, hIcon, 0, 0, 0, NULL, DI_NORMAL);
-        }
-
-        if (lpDrawItem->itemData)
-        {
-            static HFONT hFontBold = CreateBoldFont((HFONT) GetCurrentObject(lpDrawItem->hDC, OBJ_FONT));
-
-            const auto AutoFont = AutoSelectObject(lpDrawItem->hDC, hFontBold);
-
-            LPCTSTR s = (LPCTSTR) lpDrawItem->itemData;
-            RECT rc = lpDrawItem->rcItem;
-            DrawText(lpDrawItem->hDC, s, -1, &rc, DT_LEFT | DT_VCENTER);
-        }
-    }
-}
-
 void RootWindow::OnCommand(int id, HWND hWndCtl, UINT codeNotify)
 {
     switch (id)
@@ -549,14 +452,17 @@ LRESULT RootWindow::HandleMessage(const UINT uMsg, const WPARAM wParam, const LP
         HANDLE_MSG(WM_ACTIVATE, OnActivate);
 
         HANDLE_MSG(WM_INITMENUPOPUP, OnInitMenuPopup);
-        HANDLE_MSG(WM_MEASUREITEM, OnMeasureItem);
-        HANDLE_MSG(WM_DRAWITEM, OnDrawItem);
 
         HANDLE_MSG(WM_COMMAND, OnCommand);
     }
 
     if (!IsHandled())
         ret = Window::HandleMessage(uMsg, wParam, lParam);
+
+    bool bHandled = false;
+    const LRESULT subret = m_jlmh.ProcessMessage(*this, uMsg, wParam, lParam, bHandled);
+    if (bHandled)
+        ret = subret;
 
     return ret;
 }
