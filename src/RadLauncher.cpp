@@ -1,3 +1,5 @@
+#include "JumpListMenuHandler.h"
+
 #include "Rad/Window.h"
 #include "Rad/Windowxx.h"
 #include "Rad/Log.h"

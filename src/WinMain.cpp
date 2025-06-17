@@ -2,8 +2,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <tchar.h>
+#include <exception>
+#include <system_error>
 #include <objbase.h>
 //#include <commctrl.h>
+
+//#pragma comment(linker,"\"/manifestdependency:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 HINSTANCE g_hInstance = NULL;
 HACCEL g_hAccelTable = NULL;
@@ -17,7 +21,6 @@ int DoMessageLoop()
     MSG msg;
     while (GetMessage(&msg, nullptr, 0, 0))
     {
-
         if ((g_hWndDlg == NULL || !IsDialogMessage(g_hWndDlg, &msg))
             && (g_hAccelTable == NULL || !TranslateAccelerator(g_hWndAccel, g_hAccelTable, &msg)))
         {
@@ -28,11 +31,20 @@ int DoMessageLoop()
     return int(msg.wParam);
 }
 
-int WINAPI _tWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPTSTR lpCmdLine, _In_ int nShowCmd)
+void DisplayError(const std::exception& e, const char* title)
 {
+    MessageBoxA(NULL, e.what(), title, MB_ICONERROR | MB_OK);
+}
+
+int WINAPI _tWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPTSTR lpCmdLine, _In_ int nShowCmd)
+try
+{
+#ifdef _DEBUG
+    _CrtSetDbgFlag(_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) | _CRTDBG_LEAK_CHECK_DF);
+#endif
+
     int ret = 0;
     g_hInstance = hInstance;
-
 #ifdef _OBJBASE_H_  // from objbase.h
     if (SUCCEEDED(CoInitialize(nullptr)))
 #endif
@@ -48,6 +60,21 @@ int WINAPI _tWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
         CoUninitialize();
 #endif
     }
-
+    _ASSERTE(_CrtCheckMemory());
+    _ASSERTE(!_CrtDumpMemoryLeaks());
     return ret;
+}
+catch (const std::system_error& e)
+{
+    char Filename[MAX_PATH];
+    GetModuleFileNameA(NULL, Filename, ARRAYSIZE(Filename));
+    DisplayError(e, Filename);
+    return e.code().value();
+}
+catch (const std::exception& e)
+{
+    char Filename[MAX_PATH];
+    GetModuleFileNameA(NULL, Filename, ARRAYSIZE(Filename));
+    DisplayError(e, Filename);
+    return 1;
 }

@@ -7,6 +7,7 @@
 #include "ShellUtils.h"
 #include "ImageUtils.h"
 #include "WindowsUtils.h"
+#include "OwnerDrawnMenuHandler.h"
 
 #include "Rad/Log.h"
 #include "Rad/MemoryPlus.h"
