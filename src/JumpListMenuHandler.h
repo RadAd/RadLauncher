@@ -29,8 +29,10 @@ public:
         CHECK_LE(SetMenuInfo(hMenu.get(), &mnfo));
 
         int id = TrackPopupMenu(hMenu.get(), TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y, 0, hWnd, nullptr);
+        if (id <= 0)
+            return false;
         ::DoJumpListMenu(hMenu.get(), hWnd, id);
-        return id > 0;
+        return true;
     }
 
 private:
